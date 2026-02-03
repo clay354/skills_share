@@ -2,13 +2,34 @@
 
 import { useState } from "react";
 
+const installPrompt = `다음 MCP 서버를 전역 설정에 추가해주세요.
+
+## MCP 서버 정보
+- **이름**: Skills Share MCP
+- **타입**: stdio
+- **설명**: skills-share 웹사이트의 커맨드, 플러그인, MCP 설정을 Claude Code에 바로 설치할 수 있게 해주는 메타 MCP 서버
+
+## 설치 방법
+
+\`~/.claude.json\` 파일의 \`mcpServers\` 섹션에 다음을 추가하세요:
+
+\`\`\`json
+"skills-share": {
+  "command": "npx",
+  "args": ["-y", "skills-share-mcp"]
+}
+\`\`\`
+
+## 추가 설정
+1. Node.js 18+ 설치 필요
+2. 설치 후 Claude Code를 재시작하세요`;
+
 export function QuickInstall() {
   const [copied, setCopied] = useState(false);
-  const installCommand = "claude mcp add skills-share -- npx -y skills-share-mcp";
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(installCommand);
+      await navigator.clipboard.writeText(installPrompt);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -28,14 +49,8 @@ export function QuickInstall() {
           MCP 서버로 한 번에 설치하기
         </h2>
         <p className="text-sm text-neutral-600 mb-4">
-          아래 명령어를 터미널에서 실행하면, Claude Code에서 이 사이트의 모든 확장 기능을 바로 설치할 수 있습니다.
+          아래 버튼을 클릭해서 프롬프트를 복사한 후, Claude Code에 붙여넣기 하세요.
         </p>
-
-        <div className="bg-white border border-neutral-200 rounded-xl p-4 mb-4">
-          <code className="text-sm text-neutral-800 break-all">
-            {installCommand}
-          </code>
-        </div>
 
         <button
           onClick={handleCopy}
@@ -45,7 +60,7 @@ export function QuickInstall() {
               : "bg-purple-600 text-white hover:bg-purple-700"
           }`}
         >
-          {copied ? "Copied!" : "Copy Command"}
+          {copied ? "Copied!" : "Copy Install Prompt"}
         </button>
 
         <p className="text-xs text-neutral-500 mt-4 text-center">
