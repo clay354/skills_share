@@ -2,6 +2,8 @@
 
 Claude Code에서 커맨드, MCP 서버, 플러그인을 쉽게 설치할 수 있게 해주는 MCP 서버입니다.
 
+**데이터는 Vercel에서 실시간으로 가져옵니다.** 웹사이트에 새로운 skill/command/mcp가 추가되면 자동으로 반영됩니다.
+
 ## 설치
 
 ### Claude Code 설정에 추가

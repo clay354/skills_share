@@ -6,10 +6,52 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { commands, mcpServers, plugins } from "./data.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+
+// API Base URL - Vercel에 배포된 웹사이트
+const API_BASE_URL = process.env.SKILLS_SHARE_API_URL || "https://skills-share.vercel.app";
+
+// API 호출 헬퍼
+async function fetchAPI(endpoint: string): Promise<unknown> {
+  const response = await fetch(`${API_BASE_URL}/api${endpoint}`);
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status}`);
+  }
+  return response.json();
+}
+
+interface Command {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  content: string;
+  installPath: string;
+  examples: { input: string; description: string }[];
+}
+
+interface MCPServer {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  type: string;
+  config: Record<string, unknown>;
+  installLocation: string;
+  setupSteps?: string[];
+  examples: { input: string; description: string }[];
+}
+
+interface Plugin {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  agents?: string[];
+  skills?: string[];
+}
 
 const server = new Server(
   {
@@ -139,268 +181,215 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
-  switch (name) {
-    case "list_commands": {
-      const category = (args as { category?: string }).category;
-      let filtered = commands;
-      if (category) {
-        filtered = commands.filter(
-          (c) => c.category.toLowerCase() === category.toLowerCase()
-        );
-      }
-      const list = filtered.map((c) => ({
-        id: c.id,
-        name: c.name,
-        description: c.description,
-        category: c.category,
-      }));
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(list, null, 2),
-          },
-        ],
-      };
-    }
-
-    case "list_mcp_servers": {
-      const category = (args as { category?: string }).category;
-      let filtered = mcpServers;
-      if (category) {
-        filtered = mcpServers.filter(
-          (m) => m.category.toLowerCase() === category.toLowerCase()
-        );
-      }
-      const list = filtered.map((m) => ({
-        id: m.id,
-        name: m.name,
-        description: m.description,
-        category: m.category,
-        type: m.type,
-      }));
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(list, null, 2),
-          },
-        ],
-      };
-    }
-
-    case "list_plugins": {
-      const list = plugins.map((p) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        category: p.category,
-        agents: p.agents,
-        skills: p.skills,
-      }));
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(list, null, 2),
-          },
-        ],
-      };
-    }
-
-    case "get_command_detail": {
-      const id = (args as { id: string }).id;
-      const command = commands.find((c) => c.id === id);
-      if (!command) {
+  try {
+    switch (name) {
+      case "list_commands": {
+        const category = (args as { category?: string }).category;
+        const endpoint = category ? `/commands?category=${encodeURIComponent(category)}` : "/commands";
+        const commands = await fetchAPI(endpoint) as Command[];
         return {
           content: [
             {
               type: "text",
-              text: `커맨드를 찾을 수 없습니다: ${id}`,
+              text: JSON.stringify(commands, null, 2),
             },
           ],
-          isError: true,
         };
       }
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(command, null, 2),
-          },
-        ],
-      };
-    }
 
-    case "get_mcp_detail": {
-      const id = (args as { id: string }).id;
-      const mcp = mcpServers.find((m) => m.id === id);
-      if (!mcp) {
+      case "list_mcp_servers": {
+        const category = (args as { category?: string }).category;
+        const endpoint = category ? `/mcp?category=${encodeURIComponent(category)}` : "/mcp";
+        const mcpServers = await fetchAPI(endpoint) as MCPServer[];
         return {
           content: [
             {
               type: "text",
-              text: `MCP 서버를 찾을 수 없습니다: ${id}`,
+              text: JSON.stringify(mcpServers, null, 2),
             },
           ],
-          isError: true,
         };
       }
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(mcp, null, 2),
-          },
-        ],
-      };
-    }
 
-    case "install_command": {
-      const id = (args as { id: string }).id;
-      const command = commands.find((c) => c.id === id);
-      if (!command) {
+      case "list_plugins": {
+        const plugins = await fetchAPI("/plugins") as Plugin[];
         return {
           content: [
             {
               type: "text",
-              text: `커맨드를 찾을 수 없습니다: ${id}`,
+              text: JSON.stringify(plugins, null, 2),
             },
           ],
-          isError: true,
         };
       }
 
-      // Create ~/.claude/commands directory
-      const commandsDir = path.join(os.homedir(), ".claude", "commands");
-      fs.mkdirSync(commandsDir, { recursive: true });
-
-      // Write command file
-      const filePath = path.join(commandsDir, `${command.id}.md`);
-      fs.writeFileSync(filePath, command.content, "utf-8");
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `✅ 커맨드 설치 완료!\n\n📁 설치 위치: ${filePath}\n\n사용법: /${command.id}\n\n예시:\n${command.examples.map((e) => `- ${e.input}: ${e.description}`).join("\n")}`,
-          },
-        ],
-      };
-    }
-
-    case "install_mcp": {
-      const id = (args as { id: string }).id;
-      const mcp = mcpServers.find((m) => m.id === id);
-      if (!mcp) {
+      case "get_command_detail": {
+        const id = (args as { id: string }).id;
+        const command = await fetchAPI(`/commands?id=${encodeURIComponent(id)}`) as Command;
         return {
           content: [
             {
               type: "text",
-              text: `MCP 서버를 찾을 수 없습니다: ${id}`,
+              text: JSON.stringify(command, null, 2),
             },
           ],
-          isError: true,
         };
       }
 
-      const configSnippet = {
-        [mcp.id]: mcp.config,
-      };
+      case "get_mcp_detail": {
+        const id = (args as { id: string }).id;
+        const mcp = await fetchAPI(`/mcp?id=${encodeURIComponent(id)}`) as MCPServer;
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(mcp, null, 2),
+            },
+          ],
+        };
+      }
 
-      let instructions = `📦 ${mcp.name} 설치 가이드\n\n`;
-      instructions += `설정 위치: ${mcp.installLocation === "global" ? "~/.claude/settings.json" : ".claude/settings.json"}\n\n`;
-      instructions += `mcpServers에 추가할 설정:\n\`\`\`json\n${JSON.stringify(configSnippet, null, 2)}\n\`\`\`\n\n`;
+      case "install_command": {
+        const id = (args as { id: string }).id;
+        const command = await fetchAPI(`/commands?id=${encodeURIComponent(id)}`) as Command;
 
-      if (mcp.setupSteps && mcp.setupSteps.length > 0) {
-        instructions += `설정 단계:\n`;
-        mcp.setupSteps.forEach((step, i) => {
-          instructions += `${i + 1}. ${step}\n`;
+        // Create ~/.claude/commands directory
+        const commandsDir = path.join(os.homedir(), ".claude", "commands");
+        fs.mkdirSync(commandsDir, { recursive: true });
+
+        // Write command file
+        const filePath = path.join(commandsDir, `${command.id}.md`);
+        fs.writeFileSync(filePath, command.content, "utf-8");
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `✅ 커맨드 설치 완료!\n\n📁 설치 위치: ${filePath}\n\n사용법: /${command.id}\n\n예시:\n${command.examples.map((e) => `- ${e.input}: ${e.description}`).join("\n")}`,
+            },
+          ],
+        };
+      }
+
+      case "install_mcp": {
+        const id = (args as { id: string }).id;
+        const mcp = await fetchAPI(`/mcp?id=${encodeURIComponent(id)}`) as MCPServer;
+
+        const configSnippet = {
+          [mcp.id]: mcp.config,
+        };
+
+        let instructions = `📦 ${mcp.name} 설치 가이드\n\n`;
+        instructions += `설정 위치: ${mcp.installLocation === "global" ? "~/.claude/settings.json" : ".claude/settings.json"}\n\n`;
+        instructions += `mcpServers에 추가할 설정:\n\`\`\`json\n${JSON.stringify(configSnippet, null, 2)}\n\`\`\`\n\n`;
+
+        if (mcp.setupSteps && mcp.setupSteps.length > 0) {
+          instructions += `설정 단계:\n`;
+          mcp.setupSteps.forEach((step, i) => {
+            instructions += `${i + 1}. ${step}\n`;
+          });
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: instructions,
+            },
+          ],
+        };
+      }
+
+      case "search": {
+        const query = (args as { query: string }).query.toLowerCase();
+        const results: Array<{ type: string; id: string; name: string; description: string }> = [];
+
+        // Fetch all data
+        const [commands, mcpServers, plugins] = await Promise.all([
+          fetchAPI("/commands") as Promise<Command[]>,
+          fetchAPI("/mcp") as Promise<MCPServer[]>,
+          fetchAPI("/plugins") as Promise<Plugin[]>,
+        ]);
+
+        commands.forEach((c) => {
+          if (
+            c.name.toLowerCase().includes(query) ||
+            c.description.toLowerCase().includes(query) ||
+            c.id.toLowerCase().includes(query)
+          ) {
+            results.push({
+              type: "command",
+              id: c.id,
+              name: c.name,
+              description: c.description,
+            });
+          }
         });
+
+        mcpServers.forEach((m) => {
+          if (
+            m.name.toLowerCase().includes(query) ||
+            m.description.toLowerCase().includes(query) ||
+            m.id.toLowerCase().includes(query)
+          ) {
+            results.push({
+              type: "mcp",
+              id: m.id,
+              name: m.name,
+              description: m.description,
+            });
+          }
+        });
+
+        plugins.forEach((p) => {
+          if (
+            p.name.toLowerCase().includes(query) ||
+            p.description.toLowerCase().includes(query) ||
+            p.id.toLowerCase().includes(query)
+          ) {
+            results.push({
+              type: "plugin",
+              id: p.id,
+              name: p.name,
+              description: p.description,
+            });
+          }
+        });
+
+        return {
+          content: [
+            {
+              type: "text",
+              text:
+                results.length > 0
+                  ? JSON.stringify(results, null, 2)
+                  : `"${query}"에 대한 검색 결과가 없습니다.`,
+            },
+          ],
+        };
       }
 
-      return {
-        content: [
-          {
-            type: "text",
-            text: instructions,
-          },
-        ],
-      };
+      default:
+        return {
+          content: [
+            {
+              type: "text",
+              text: `알 수 없는 도구: ${name}`,
+            },
+          ],
+          isError: true,
+        };
     }
-
-    case "search": {
-      const query = (args as { query: string }).query.toLowerCase();
-      const results: Array<{ type: string; id: string; name: string; description: string }> = [];
-
-      commands.forEach((c) => {
-        if (
-          c.name.toLowerCase().includes(query) ||
-          c.description.toLowerCase().includes(query) ||
-          c.id.toLowerCase().includes(query)
-        ) {
-          results.push({
-            type: "command",
-            id: c.id,
-            name: c.name,
-            description: c.description,
-          });
-        }
-      });
-
-      mcpServers.forEach((m) => {
-        if (
-          m.name.toLowerCase().includes(query) ||
-          m.description.toLowerCase().includes(query) ||
-          m.id.toLowerCase().includes(query)
-        ) {
-          results.push({
-            type: "mcp",
-            id: m.id,
-            name: m.name,
-            description: m.description,
-          });
-        }
-      });
-
-      plugins.forEach((p) => {
-        if (
-          p.name.toLowerCase().includes(query) ||
-          p.description.toLowerCase().includes(query) ||
-          p.id.toLowerCase().includes(query)
-        ) {
-          results.push({
-            type: "plugin",
-            id: p.id,
-            name: p.name,
-            description: p.description,
-          });
-        }
-      });
-
-      return {
-        content: [
-          {
-            type: "text",
-            text:
-              results.length > 0
-                ? JSON.stringify(results, null, 2)
-                : `"${query}"에 대한 검색 결과가 없습니다.`,
-          },
-        ],
-      };
-    }
-
-    default:
-      return {
-        content: [
-          {
-            type: "text",
-            text: `알 수 없는 도구: ${name}`,
-          },
-        ],
-        isError: true,
-      };
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `오류 발생: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+      isError: true,
+    };
   }
 });
 
