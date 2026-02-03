@@ -1,0 +1,30 @@
+{
+  "name": "@skills-share/mcp",
+  "version": "1.0.0",
+  "description": "Skills Share MCP Server - Install commands, skills, and MCP configs for Claude Code",
+  "main": "dist/index.js",
+  "bin": {
+    "skills-share-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "keywords": [
+    "mcp",
+    "claude",
+    "claude-code",
+    "skills",
+    "commands"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0"
+  }
+}
