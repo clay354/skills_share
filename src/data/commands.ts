@@ -209,10 +209,15 @@ chmod 600 ~/.config/figma/token
 \`\`\`json
 {
   "hooks": {
-    "post-tool-use": [
+    "PostToolUse": [
       {
-        "tools": ["Edit", "Write"],
-        "command": "test -f SPEC.md && echo '📝 SPEC.md 업데이트 필요'"
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "test -f SPEC.md && echo '📝 SPEC.md 업데이트 필요'"
+          }
+        ]
       }
     ]
   }
