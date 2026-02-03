@@ -1,5 +1,5 @@
 {
-  "name": "@skills-share/mcp",
+  "name": "skills-share-mcp",
   "version": "1.0.0",
   "description": "Skills Share MCP Server - Install commands, skills, and MCP configs for Claude Code",
   "main": "dist/index.js",

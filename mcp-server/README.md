@@ -13,7 +13,7 @@ Claude Code에서 커맨드, MCP 서버, 플러그인을 쉽게 설치할 수 �
   "mcpServers": {
     "skills-share": {
       "command": "npx",
-      "args": ["-y", "@skills-share/mcp"]
+      "args": ["-y", "skills-share-mcp"]
     }
   }
 }
