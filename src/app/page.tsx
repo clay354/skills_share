@@ -2,6 +2,7 @@ import Link from "next/link";
 import { commands } from "@/data/commands";
 import { plugins } from "@/data/plugins";
 import { mcpServers } from "@/data/mcp";
+import { QuickInstall } from "@/components/QuickInstall";
 
 export default function Home() {
   return (
@@ -15,6 +16,9 @@ export default function Home() {
           Commands, Plugins, MCP Servers for Claude Code
         </p>
       </div>
+
+      {/* Quick Install */}
+      <QuickInstall />
 
       {/* Commands */}
       <section className="border-t border-neutral-100">
