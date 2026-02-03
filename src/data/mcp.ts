@@ -12,6 +12,27 @@ export interface MCPServer {
 
 export const mcpServers: MCPServer[] = [
   {
+    id: "skills-share",
+    name: "Skills Share MCP",
+    description: "이 웹사이트의 커맨드, 플러그인, MCP 설정을 Claude Code에 바로 설치할 수 있게 해주는 메타 MCP 서버입니다.",
+    category: "Meta",
+    type: "stdio",
+    config: {
+      command: "npx",
+      args: ["-y", "skills-share-mcp"]
+    },
+    installLocation: "global",
+    setupSteps: [
+      "Node.js 18+ 설치 필요",
+      "설치 후 Claude Code를 재시작하세요"
+    ],
+    examples: [
+      { input: "skills-share에서 pr-description 커맨드 설치해줘", description: "커맨드 설치" },
+      { input: "skills-share에 어떤 플러그인 있어?", description: "플러그인 목록 확인" },
+      { input: "Context7 MCP 설치해줘", description: "MCP 서버 설치" },
+    ]
+  },
+  {
     id: "figma",
     name: "Figma MCP",
     description: "Figma 파일을 직접 읽고 분석할 수 있게 해주는 MCP 서버. 디자인 시스템 분석, 컴포넌트 추출 등에 유용합니다.",
