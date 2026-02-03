@@ -11,7 +11,7 @@ import * as path from "path";
 import * as os from "os";
 
 // API Base URL - Vercel에 배포된 웹사이트
-const API_BASE_URL = process.env.SKILLS_SHARE_API_URL || "https://skills-share.vercel.app";
+const API_BASE_URL = process.env.SKILLS_SHARE_API_URL || "https://skills-share-beta.vercel.app";
 
 // API 호출 헬퍼
 async function fetchAPI(endpoint: string): Promise<unknown> {
