@@ -1,10 +1,53 @@
 import Link from "next/link";
-import { commands } from "@/data/commands";
-import { plugins } from "@/data/plugins";
-import { mcpServers } from "@/data/mcp";
+import { commands, Command } from "@/data/commands";
+import { plugins, Plugin } from "@/data/plugins";
+import { mcpServers, MCPServer } from "@/data/mcp";
 import { QuickInstall } from "@/components/QuickInstall";
+import redis, { REDIS_KEYS } from "@/lib/redis";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+async function getAllData() {
+  try {
+    const [uploadedCommands, uploadedPlugins, uploadedMcpServers] = await Promise.all([
+      redis.get<Command[]>(REDIS_KEYS.commands),
+      redis.get<Plugin[]>(REDIS_KEYS.plugins),
+      redis.get<MCPServer[]>(REDIS_KEYS.mcpServers),
+    ]);
+
+    // Combine static and uploaded data, avoiding duplicates by id
+    const staticIds = {
+      commands: new Set(commands.map(c => c.id)),
+      plugins: new Set(plugins.map(p => p.id)),
+      mcpServers: new Set(mcpServers.map(m => m.id)),
+    };
+
+    const allCommands = [
+      ...commands,
+      ...(uploadedCommands || []).filter(c => !staticIds.commands.has(c.id)),
+    ];
+    const allPlugins = [
+      ...plugins,
+      ...(uploadedPlugins || []).filter(p => !staticIds.plugins.has(p.id)),
+    ];
+    const allMcpServers = [
+      ...mcpServers,
+      ...(uploadedMcpServers || []).filter(m => !staticIds.mcpServers.has(m.id)),
+    ];
+
+    return { allCommands, allPlugins, allMcpServers };
+  } catch {
+    // Fallback to static data if Redis fails
+    return {
+      allCommands: commands,
+      allPlugins: plugins,
+      allMcpServers: mcpServers,
+    };
+  }
+}
+
+export default async function Home() {
+  const { allCommands, allPlugins, allMcpServers } = await getAllData();
   return (
     <div className="min-h-screen bg-white">
       {/* Hero */}
@@ -28,7 +71,7 @@ export default function Home() {
             <p className="text-neutral-500 text-sm">Slash commands for Claude Code</p>
           </div>
           <div className="space-y-3">
-            {commands.map((cmd) => (
+            {allCommands.map((cmd) => (
               <Link key={cmd.id} href={`/commands/${cmd.id}`}>
                 <div className="p-4 border border-neutral-200 rounded-xl hover:border-neutral-300 hover:bg-neutral-50 transition-all">
                   <div className="flex items-start justify-between gap-4">
@@ -55,7 +98,7 @@ export default function Home() {
             <p className="text-neutral-500 text-sm">Extension packages with agents and skills</p>
           </div>
           <div className="space-y-3">
-            {plugins.map((plugin) => (
+            {allPlugins.map((plugin) => (
               <Link key={plugin.id} href={`/plugins/${plugin.id}`}>
                 <div className="p-4 border border-neutral-200 rounded-xl hover:border-neutral-300 hover:bg-neutral-50 transition-all">
                   <div className="flex items-start justify-between gap-4 mb-3">
@@ -83,7 +126,7 @@ export default function Home() {
             <p className="text-neutral-500 text-sm">Model Context Protocol servers</p>
           </div>
           <div className="space-y-3">
-            {mcpServers.map((mcp) => (
+            {allMcpServers.map((mcp) => (
               <Link key={mcp.id} href={`/mcp/${mcp.id}`}>
                 <div className="p-4 border border-neutral-200 rounded-xl hover:border-neutral-300 hover:bg-neutral-50 transition-all">
                   <div className="flex items-start justify-between gap-4">

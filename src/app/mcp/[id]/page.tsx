@@ -1,20 +1,33 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { mcpServers } from "@/data/mcp";
+import { mcpServers, MCPServer } from "@/data/mcp";
 import { generateMCPInstallPrompt } from "@/lib/installPrompts";
 import { CopyButton } from "@/components/CopyButton";
+import redis, { REDIS_KEYS } from "@/lib/redis";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export async function generateStaticParams() {
-  return mcpServers.map((mcp) => ({ id: mcp.id }));
+export const dynamic = "force-dynamic";
+
+async function getMCPById(id: string): Promise<MCPServer | undefined> {
+  // First check static data
+  const staticMcp = mcpServers.find((m) => m.id === id);
+  if (staticMcp) return staticMcp;
+
+  // Then check Redis for uploaded data
+  try {
+    const uploadedServers = await redis.get<MCPServer[]>(REDIS_KEYS.mcpServers) || [];
+    return uploadedServers.find((m) => m.id === id);
+  } catch {
+    return undefined;
+  }
 }
 
 export default async function MCPDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const mcp = mcpServers.find((m) => m.id === id);
+  const mcp = await getMCPById(id);
 
   if (!mcp) {
     notFound();
@@ -63,6 +76,21 @@ export default async function MCPDetailPage({ params }: PageProps) {
                 </li>
               ))}
             </ol>
+          </div>
+        )}
+
+        {/* Tools */}
+        {mcp.tools && mcp.tools.length > 0 && (
+          <div className="mb-8">
+            <h2 className="font-medium text-black mb-4">Tools ({mcp.tools.length})</h2>
+            <div className="space-y-2">
+              {mcp.tools.map((tool, i) => (
+                <div key={i} className="bg-neutral-50 rounded-xl p-4">
+                  <p className="text-sm font-medium text-black font-mono">{tool.name}</p>
+                  <p className="text-sm text-neutral-600 mt-1">{tool.description}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

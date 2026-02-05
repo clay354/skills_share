@@ -1,20 +1,33 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { commands } from "@/data/commands";
+import { commands, Command } from "@/data/commands";
 import { generateCommandInstallPrompt } from "@/lib/installPrompts";
 import { CopyButton } from "@/components/CopyButton";
+import redis, { REDIS_KEYS } from "@/lib/redis";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export async function generateStaticParams() {
-  return commands.map((cmd) => ({ id: cmd.id }));
+export const dynamic = "force-dynamic";
+
+async function getCommandById(id: string): Promise<Command | undefined> {
+  // First check static data
+  const staticCmd = commands.find((cmd) => cmd.id === id);
+  if (staticCmd) return staticCmd;
+
+  // Then check Redis for uploaded data
+  try {
+    const uploadedCommands = await redis.get<Command[]>(REDIS_KEYS.commands) || [];
+    return uploadedCommands.find((cmd) => cmd.id === id);
+  } catch {
+    return undefined;
+  }
 }
 
 export default async function CommandDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const command = commands.find((cmd) => cmd.id === id);
+  const command = await getCommandById(id);
 
   if (!command) {
     notFound();

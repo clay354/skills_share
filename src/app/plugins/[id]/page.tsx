@@ -1,20 +1,33 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { plugins } from "@/data/plugins";
+import { plugins, Plugin } from "@/data/plugins";
 import { generatePluginInstallPrompt } from "@/lib/installPrompts";
 import { CopyButton } from "@/components/CopyButton";
+import redis, { REDIS_KEYS } from "@/lib/redis";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export async function generateStaticParams() {
-  return plugins.map((plugin) => ({ id: plugin.id }));
+export const dynamic = "force-dynamic";
+
+async function getPluginById(id: string): Promise<Plugin | undefined> {
+  // First check static data
+  const staticPlugin = plugins.find((p) => p.id === id);
+  if (staticPlugin) return staticPlugin;
+
+  // Then check Redis for uploaded data
+  try {
+    const uploadedPlugins = await redis.get<Plugin[]>(REDIS_KEYS.plugins) || [];
+    return uploadedPlugins.find((p) => p.id === id);
+  } catch {
+    return undefined;
+  }
 }
 
 export default async function PluginDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const plugin = plugins.find((p) => p.id === id);
+  const plugin = await getPluginById(id);
 
   if (!plugin) {
     notFound();
