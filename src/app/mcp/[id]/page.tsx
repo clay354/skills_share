@@ -44,6 +44,12 @@ export default async function MCPDetailPage({ params }: PageProps) {
           </span>
           <h1 className="text-2xl font-semibold text-black mt-3 mb-2">{mcp.name}</h1>
           <p className="text-neutral-600">{mcp.description}</p>
+          {mcp.updatedAt && (
+            <p className="text-sm text-neutral-500 mt-3">
+              Updated: {new Date(mcp.updatedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              {mcp.updatedBy && <span> by <span className="font-medium text-neutral-600">{mcp.updatedBy}</span></span>}
+            </p>
+          )}
         </div>
 
         {/* Install */}
@@ -109,13 +115,7 @@ export default async function MCPDetailPage({ params }: PageProps) {
             <div className="text-sm text-neutral-600 space-y-2">
               <p>Type: {mcp.type}</p>
               <p>Scope: {mcp.installLocation === "global" ? "Global (~/.claude.json)" : "Project"}</p>
-              {mcp.updatedAt && (
-                <p className="text-neutral-500">
-                  Updated: {new Date(mcp.updatedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  {mcp.updatedBy && <span> by <span className="font-medium text-neutral-600">{mcp.updatedBy}</span></span>}
-                </p>
-              )}
-              <details className="mt-4">
+              <details className="mt-2">
                 <summary className="cursor-pointer text-neutral-500 hover:text-neutral-700">
                   View config
                 </summary>

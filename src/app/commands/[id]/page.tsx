@@ -56,8 +56,9 @@ export default async function CommandDetailPage({ params }: PageProps) {
           <h1 className="text-2xl font-semibold text-black mb-2">{command.name}</h1>
           <p className="text-neutral-600">{command.description}</p>
           {command.updatedAt && (
-            <p className="text-xs text-neutral-400 mt-2">
-              {new Date(command.updatedAt).toLocaleDateString('ko-KR')} · {command.updatedBy}
+            <p className="text-sm text-neutral-500 mt-3">
+              Updated: {new Date(command.updatedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              {command.updatedBy && <span> by <span className="font-medium text-neutral-600">{command.updatedBy}</span></span>}
             </p>
           )}
         </div>
@@ -94,17 +95,13 @@ export default async function CommandDetailPage({ params }: PageProps) {
         <div className="border-t border-neutral-100 pt-8">
           <h2 className="font-medium text-black mb-4">Details</h2>
           <div className="bg-neutral-50 rounded-xl p-4">
-            <div className="text-sm text-neutral-600 space-y-2">
-              <p>Path: <span className="font-mono">{command.installPath}</span></p>
-              <p>Usage: <span className="font-mono">/{command.id}</span></p>
-              {command.updatedAt && (
-                <p className="text-neutral-500">
-                  Updated: {new Date(command.updatedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  {command.updatedBy && <span> by <span className="font-medium text-neutral-600">{command.updatedBy}</span></span>}
-                </p>
-              )}
-            </div>
-            <details className="mt-4">
+            <p className="text-sm text-neutral-600 mb-2">
+              Path: <span className="font-mono">{command.installPath}</span>
+            </p>
+            <p className="text-sm text-neutral-600 mb-4">
+              Usage: <span className="font-mono">/{command.id}</span>
+            </p>
+            <details>
               <summary className="cursor-pointer text-sm text-neutral-500 hover:text-neutral-700">
                 View current file content
               </summary>
