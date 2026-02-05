@@ -1,20 +1,28 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { mcpServers } from "@/data/mcp";
+import { MCPServer } from "@/data/mcp";
 import { generateMCPInstallPrompt } from "@/lib/installPrompts";
 import { CopyButton } from "@/components/CopyButton";
+import redis, { REDIS_KEYS } from "@/lib/redis";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export async function generateStaticParams() {
-  return mcpServers.map((mcp) => ({ id: mcp.id }));
+export const dynamic = "force-dynamic";
+
+async function getMCPById(id: string): Promise<MCPServer | undefined> {
+  try {
+    const mcpServers = await redis.get<MCPServer[]>(REDIS_KEYS.mcpServers) || [];
+    return mcpServers.find((m) => m.id === id);
+  } catch {
+    return undefined;
+  }
 }
 
 export default async function MCPDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const mcp = mcpServers.find((m) => m.id === id);
+  const mcp = await getMCPById(id);
 
   if (!mcp) {
     notFound();
@@ -66,6 +74,21 @@ export default async function MCPDetailPage({ params }: PageProps) {
           </div>
         )}
 
+        {/* Tools */}
+        {mcp.tools && mcp.tools.length > 0 && (
+          <div className="mb-8">
+            <h2 className="font-medium text-black mb-4">Tools ({mcp.tools.length})</h2>
+            <div className="space-y-2">
+              {mcp.tools.map((tool, i) => (
+                <div key={i} className="bg-neutral-50 rounded-xl p-4">
+                  <p className="text-sm font-medium text-black font-mono">{tool.name}</p>
+                  <p className="text-sm text-neutral-600 mt-1">{tool.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Examples */}
         <div className="mb-8">
           <h2 className="font-medium text-black mb-4">Examples</h2>
@@ -86,6 +109,12 @@ export default async function MCPDetailPage({ params }: PageProps) {
             <div className="text-sm text-neutral-600 space-y-2">
               <p>Type: {mcp.type}</p>
               <p>Scope: {mcp.installLocation === "global" ? "Global (~/.claude.json)" : "Project"}</p>
+              {mcp.updatedAt && (
+                <p className="text-neutral-500">
+                  Updated: {new Date(mcp.updatedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  {mcp.updatedBy && <span> by <span className="font-medium text-neutral-600">{mcp.updatedBy}</span></span>}
+                </p>
+              )}
               <details className="mt-4">
                 <summary className="cursor-pointer text-neutral-500 hover:text-neutral-700">
                   View config

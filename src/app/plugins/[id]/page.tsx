@@ -1,20 +1,28 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { plugins } from "@/data/plugins";
+import { Plugin } from "@/data/plugins";
 import { generatePluginInstallPrompt } from "@/lib/installPrompts";
 import { CopyButton } from "@/components/CopyButton";
+import redis, { REDIS_KEYS } from "@/lib/redis";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export async function generateStaticParams() {
-  return plugins.map((plugin) => ({ id: plugin.id }));
+export const dynamic = "force-dynamic";
+
+async function getPluginById(id: string): Promise<Plugin | undefined> {
+  try {
+    const plugins = await redis.get<Plugin[]>(REDIS_KEYS.plugins) || [];
+    return plugins.find((p) => p.id === id);
+  } catch {
+    return undefined;
+  }
 }
 
 export default async function PluginDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const plugin = plugins.find((p) => p.id === id);
+  const plugin = await getPluginById(id);
 
   if (!plugin) {
     notFound();
@@ -103,6 +111,14 @@ export default async function PluginDetailPage({ params }: PageProps) {
                     </span>
                   ))}
                 </div>
+              </div>
+            )}
+            {plugin.updatedAt && (
+              <div className="pt-2 border-t border-neutral-200">
+                <p className="text-sm text-neutral-500">
+                  Updated: {new Date(plugin.updatedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  {plugin.updatedBy && <span> by <span className="font-medium text-neutral-600">{plugin.updatedBy}</span></span>}
+                </p>
               </div>
             )}
           </div>

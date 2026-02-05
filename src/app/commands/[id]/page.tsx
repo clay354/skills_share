@@ -1,20 +1,28 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { commands } from "@/data/commands";
+import { Command } from "@/data/commands";
 import { generateCommandInstallPrompt } from "@/lib/installPrompts";
 import { CopyButton } from "@/components/CopyButton";
+import redis, { REDIS_KEYS } from "@/lib/redis";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export async function generateStaticParams() {
-  return commands.map((cmd) => ({ id: cmd.id }));
+export const dynamic = "force-dynamic";
+
+async function getCommandById(id: string): Promise<Command | undefined> {
+  try {
+    const commands = await redis.get<Command[]>(REDIS_KEYS.commands) || [];
+    return commands.find((cmd) => cmd.id === id);
+  } catch {
+    return undefined;
+  }
 }
 
 export default async function CommandDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const command = commands.find((cmd) => cmd.id === id);
+  const command = await getCommandById(id);
 
   if (!command) {
     notFound();
@@ -74,6 +82,12 @@ export default async function CommandDetailPage({ params }: PageProps) {
             <p className="text-sm text-neutral-600 mb-4">
               Usage: <span className="font-mono">/{command.id}</span>
             </p>
+            {command.updatedAt && (
+              <p className="text-sm text-neutral-500 mb-2">
+                Updated: {new Date(command.updatedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {command.updatedBy && <span> by <span className="font-medium text-neutral-600">{command.updatedBy}</span></span>}
+              </p>
+            )}
             <details>
               <summary className="cursor-pointer text-sm text-neutral-500 hover:text-neutral-700">
                 View file content
