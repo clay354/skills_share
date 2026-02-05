@@ -39,31 +39,31 @@ export function QuickInstall() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 pb-12">
-      <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-2xl p-6">
+      <div className="bg-orange-100 border-4 border-orange-600 shadow-[6px_6px_0px_0px_rgba(194,65,12,1)] p-6">
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded font-medium">
+          <span className="text-xs px-2 py-1 bg-yellow-300 text-orange-900 font-bold border-2 border-orange-600">
             Quick Start
           </span>
         </div>
-        <h2 className="text-lg font-semibold text-black mb-2">
+        <h2 className="text-xl font-bold text-orange-900 mb-2">
           MCP 서버로 한 번에 설치하기
         </h2>
-        <p className="text-sm text-neutral-600 mb-4">
+        <p className="text-sm text-orange-700 font-medium mb-4">
           아래 버튼을 클릭해서 프롬프트를 복사한 후, Claude Code에 붙여넣기 하세요.
         </p>
 
         <button
           onClick={handleCopy}
-          className={`w-full py-2.5 rounded-lg text-sm font-medium transition-all ${
+          className={`w-full py-3 text-sm font-bold transition-all border-4 ${
             copied
-              ? "bg-green-500 text-white"
-              : "bg-purple-600 text-white hover:bg-purple-700"
+              ? "bg-green-400 text-green-900 border-green-700 shadow-[4px_4px_0px_0px_rgba(21,128,61,1)]"
+              : "bg-orange-500 text-white border-orange-800 shadow-[4px_4px_0px_0px_rgba(154,52,18,1)] hover:shadow-[6px_6px_0px_0px_rgba(154,52,18,1)] hover:-translate-x-0.5 hover:-translate-y-0.5"
           }`}
         >
           {copied ? "Copied!" : "Copy Install Prompt"}
         </button>
 
-        <p className="text-xs text-neutral-500 mt-4 text-center">
+        <p className="text-xs text-orange-600 font-medium mt-4 text-center">
           설치 후 Claude Code를 재시작하세요. 그러면 &ldquo;skills-share에서 pr-description 설치해줘&rdquo; 같은 요청이 가능해집니다.
         </p>
       </div>
