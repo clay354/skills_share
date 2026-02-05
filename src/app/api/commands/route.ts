@@ -132,3 +132,97 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function PUT(request: Request) {
+  try {
+    const updateData = await request.json() as Partial<Command>;
+
+    // Validate required field
+    if (!updateData.id) {
+      return NextResponse.json(
+        { error: 'Missing required field: id' },
+        { status: 400 }
+      );
+    }
+
+    // Check if command exists in uploaded commands (can't update built-in)
+    let uploadedCommands: Command[] = [];
+    try {
+      uploadedCommands = await get<Command[]>('commands') || [];
+    } catch {
+      uploadedCommands = [];
+    }
+
+    const existingIndex = uploadedCommands.findIndex(c => c.id === updateData.id);
+
+    // Check if it's a built-in command
+    if (builtInCommands.some(c => c.id === updateData.id)) {
+      return NextResponse.json(
+        { error: `Cannot update built-in command "${updateData.id}"` },
+        { status: 403 }
+      );
+    }
+
+    if (existingIndex === -1) {
+      return NextResponse.json(
+        { error: `Command with id "${updateData.id}" not found` },
+        { status: 404 }
+      );
+    }
+
+    // Merge with existing command
+    const existingCommand = uploadedCommands[existingIndex];
+    const updatedCommand: Command = {
+      ...existingCommand,
+      name: updateData.name || existingCommand.name,
+      description: updateData.description ?? existingCommand.description,
+      category: updateData.category || existingCommand.category,
+      content: updateData.content || existingCommand.content,
+      installPath: updateData.installPath || existingCommand.installPath,
+      examples: updateData.examples || existingCommand.examples,
+    };
+
+    // Replace in array
+    uploadedCommands[existingIndex] = updatedCommand;
+
+    // Update Edge Config via Vercel API
+    const edgeConfigId = process.env.EDGE_CONFIG_ID;
+    const vercelToken = process.env.VERCEL_API_TOKEN;
+
+    if (!edgeConfigId || !vercelToken) {
+      return NextResponse.json(
+        { error: 'Server not configured for uploads (missing EDGE_CONFIG_ID or VERCEL_API_TOKEN)' },
+        { status: 500 }
+      );
+    }
+
+    const response = await fetch(
+      `https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${vercelToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: [{ operation: 'upsert', key: 'commands', value: uploadedCommands }],
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return NextResponse.json(
+        { error: `Failed to update Edge Config: ${errorText}` },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true, id: updatedCommand.id, message: 'Command updated successfully' });
+  } catch (error) {
+    return NextResponse.json(
+      { error: `Update failed: ${error instanceof Error ? error.message : String(error)}` },
+      { status: 500 }
+    );
+  }
+}
