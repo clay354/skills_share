@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { commands, Command } from "@/data/commands";
-import { plugins, Plugin } from "@/data/plugins";
-import { mcpServers, MCPServer } from "@/data/mcp";
+import { Command } from "@/data/commands";
+import { Plugin } from "@/data/plugins";
+import { MCPServer } from "@/data/mcp";
 import { QuickInstall } from "@/components/QuickInstall";
 import redis, { REDIS_KEYS } from "@/lib/redis";
 
@@ -9,39 +9,22 @@ export const dynamic = "force-dynamic";
 
 async function getAllData() {
   try {
-    const [uploadedCommands, uploadedPlugins, uploadedMcpServers] = await Promise.all([
+    const [allCommands, allPlugins, allMcpServers] = await Promise.all([
       redis.get<Command[]>(REDIS_KEYS.commands),
       redis.get<Plugin[]>(REDIS_KEYS.plugins),
       redis.get<MCPServer[]>(REDIS_KEYS.mcpServers),
     ]);
 
-    // Combine static and uploaded data, avoiding duplicates by id
-    const staticIds = {
-      commands: new Set(commands.map(c => c.id)),
-      plugins: new Set(plugins.map(p => p.id)),
-      mcpServers: new Set(mcpServers.map(m => m.id)),
-    };
-
-    const allCommands = [
-      ...commands,
-      ...(uploadedCommands || []).filter(c => !staticIds.commands.has(c.id)),
-    ];
-    const allPlugins = [
-      ...plugins,
-      ...(uploadedPlugins || []).filter(p => !staticIds.plugins.has(p.id)),
-    ];
-    const allMcpServers = [
-      ...mcpServers,
-      ...(uploadedMcpServers || []).filter(m => !staticIds.mcpServers.has(m.id)),
-    ];
-
-    return { allCommands, allPlugins, allMcpServers };
-  } catch {
-    // Fallback to static data if Redis fails
     return {
-      allCommands: commands,
-      allPlugins: plugins,
-      allMcpServers: mcpServers,
+      allCommands: allCommands || [],
+      allPlugins: allPlugins || [],
+      allMcpServers: allMcpServers || [],
+    };
+  } catch {
+    return {
+      allCommands: [],
+      allPlugins: [],
+      allMcpServers: [],
     };
   }
 }

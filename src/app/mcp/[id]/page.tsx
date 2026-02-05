@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { mcpServers, MCPServer } from "@/data/mcp";
+import { MCPServer } from "@/data/mcp";
 import { generateMCPInstallPrompt } from "@/lib/installPrompts";
 import { CopyButton } from "@/components/CopyButton";
 import redis, { REDIS_KEYS } from "@/lib/redis";
@@ -12,14 +12,9 @@ interface PageProps {
 export const dynamic = "force-dynamic";
 
 async function getMCPById(id: string): Promise<MCPServer | undefined> {
-  // First check static data
-  const staticMcp = mcpServers.find((m) => m.id === id);
-  if (staticMcp) return staticMcp;
-
-  // Then check Redis for uploaded data
   try {
-    const uploadedServers = await redis.get<MCPServer[]>(REDIS_KEYS.mcpServers) || [];
-    return uploadedServers.find((m) => m.id === id);
+    const mcpServers = await redis.get<MCPServer[]>(REDIS_KEYS.mcpServers) || [];
+    return mcpServers.find((m) => m.id === id);
   } catch {
     return undefined;
   }

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { plugins, Plugin } from "@/data/plugins";
+import { Plugin } from "@/data/plugins";
 import { generatePluginInstallPrompt } from "@/lib/installPrompts";
 import { CopyButton } from "@/components/CopyButton";
 import redis, { REDIS_KEYS } from "@/lib/redis";
@@ -12,14 +12,9 @@ interface PageProps {
 export const dynamic = "force-dynamic";
 
 async function getPluginById(id: string): Promise<Plugin | undefined> {
-  // First check static data
-  const staticPlugin = plugins.find((p) => p.id === id);
-  if (staticPlugin) return staticPlugin;
-
-  // Then check Redis for uploaded data
   try {
-    const uploadedPlugins = await redis.get<Plugin[]>(REDIS_KEYS.plugins) || [];
-    return uploadedPlugins.find((p) => p.id === id);
+    const plugins = await redis.get<Plugin[]>(REDIS_KEYS.plugins) || [];
+    return plugins.find((p) => p.id === id);
   } catch {
     return undefined;
   }

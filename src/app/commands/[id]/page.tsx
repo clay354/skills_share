@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { commands, Command } from "@/data/commands";
+import { Command } from "@/data/commands";
 import { generateCommandInstallPrompt } from "@/lib/installPrompts";
 import { CopyButton } from "@/components/CopyButton";
 import redis, { REDIS_KEYS } from "@/lib/redis";
@@ -12,14 +12,9 @@ interface PageProps {
 export const dynamic = "force-dynamic";
 
 async function getCommandById(id: string): Promise<Command | undefined> {
-  // First check static data
-  const staticCmd = commands.find((cmd) => cmd.id === id);
-  if (staticCmd) return staticCmd;
-
-  // Then check Redis for uploaded data
   try {
-    const uploadedCommands = await redis.get<Command[]>(REDIS_KEYS.commands) || [];
-    return uploadedCommands.find((cmd) => cmd.id === id);
+    const commands = await redis.get<Command[]>(REDIS_KEYS.commands) || [];
+    return commands.find((cmd) => cmd.id === id);
   } catch {
     return undefined;
   }
