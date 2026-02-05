@@ -13,13 +13,29 @@ import * as os from "os";
 // API Base URL - Vercel에 배포된 웹사이트
 const API_BASE_URL = process.env.SKILLS_SHARE_API_URL || "https://skills-share-beta.vercel.app";
 
-// API 호출 헬퍼
+// API 호출 헬퍼 (GET)
 async function fetchAPI(endpoint: string): Promise<unknown> {
   const response = await fetch(`${API_BASE_URL}/api${endpoint}`);
   if (!response.ok) {
     throw new Error(`API error: ${response.status}`);
   }
   return response.json();
+}
+
+// API 호출 헬퍼 (POST)
+async function postAPI(endpoint: string, data: unknown): Promise<unknown> {
+  const response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error((result as { error?: string }).error || `API error: ${response.status}`);
+  }
+  return result;
 }
 
 interface Command {
@@ -49,6 +65,7 @@ interface Plugin {
   name: string;
   description: string;
   category: string;
+  marketplace: string;
   agents?: string[];
   skills?: string[];
 }
@@ -56,7 +73,7 @@ interface Plugin {
 const server = new Server(
   {
     name: "skills-share",
-    version: "1.0.0",
+    version: "1.1.0",
   },
   {
     capabilities: {
@@ -171,6 +188,126 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
           },
           required: ["query"],
+        },
+      },
+      {
+        name: "upload_command",
+        description: "로컬 커맨드 파일을 Skills Share에 업로드합니다.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            file_path: {
+              type: "string",
+              description: "업로드할 커맨드 파일 경로 (예: ~/.claude/commands/my-command.md)",
+            },
+            id: {
+              type: "string",
+              description: "커맨드 ID (파일명에서 추출됨, 선택사항)",
+            },
+            name: {
+              type: "string",
+              description: "커맨드 이름",
+            },
+            category: {
+              type: "string",
+              description: "카테고리 (예: Web, Design, Documentation)",
+            },
+            description: {
+              type: "string",
+              description: "커맨드 설명",
+            },
+          },
+          required: ["file_path", "name", "category", "description"],
+        },
+      },
+      {
+        name: "upload_mcp",
+        description: "MCP 서버 설정을 Skills Share에 업로드합니다.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description: "MCP 서버 ID",
+            },
+            name: {
+              type: "string",
+              description: "MCP 서버 이름",
+            },
+            description: {
+              type: "string",
+              description: "MCP 서버 설명",
+            },
+            category: {
+              type: "string",
+              description: "카테고리",
+            },
+            type: {
+              type: "string",
+              enum: ["stdio", "http", "sse"],
+              description: "MCP 타입",
+            },
+            config: {
+              type: "object",
+              description: "MCP 설정 객체 (command, args 등)",
+            },
+            installLocation: {
+              type: "string",
+              enum: ["global", "project"],
+              description: "설치 위치 (기본: global)",
+            },
+            setupSteps: {
+              type: "array",
+              items: { type: "string" },
+              description: "설정 단계 목록",
+            },
+          },
+          required: ["id", "name", "type", "config"],
+        },
+      },
+      {
+        name: "upload_plugin",
+        description: "플러그인 정보를 Skills Share에 업로드합니다.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description: "플러그인 ID",
+            },
+            name: {
+              type: "string",
+              description: "플러그인 이름",
+            },
+            description: {
+              type: "string",
+              description: "플러그인 설명",
+            },
+            category: {
+              type: "string",
+              description: "카테고리",
+            },
+            marketplace: {
+              type: "string",
+              description: "마켓플레이스 이름",
+            },
+            features: {
+              type: "array",
+              items: { type: "string" },
+              description: "주요 기능 목록",
+            },
+            agents: {
+              type: "array",
+              items: { type: "string" },
+              description: "포함된 에이전트 목록",
+            },
+            skills: {
+              type: "array",
+              items: { type: "string" },
+              description: "포함된 스킬 목록",
+            },
+          },
+          required: ["id", "name", "marketplace"],
         },
       },
     ],
@@ -364,6 +501,121 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 results.length > 0
                   ? JSON.stringify(results, null, 2)
                   : `"${query}"에 대한 검색 결과가 없습니다.`,
+            },
+          ],
+        };
+      }
+
+      case "upload_command": {
+        const { file_path, name: cmdName, category, description } = args as {
+          file_path: string;
+          id?: string;
+          name: string;
+          category: string;
+          description: string;
+        };
+
+        // Expand ~ to home directory
+        const expandedPath = file_path.replace(/^~/, os.homedir());
+
+        // Check if file exists
+        if (!fs.existsSync(expandedPath)) {
+          throw new Error(`파일을 찾을 수 없습니다: ${file_path}`);
+        }
+
+        // Read file content
+        const content = fs.readFileSync(expandedPath, "utf-8");
+
+        // Extract ID from filename if not provided
+        const cmdId = (args as { id?: string }).id || path.basename(expandedPath, ".md");
+
+        // Upload to API
+        const result = await postAPI("/commands", {
+          id: cmdId,
+          name: cmdName,
+          description,
+          category,
+          content,
+          installPath: `~/.claude/commands/${cmdId}.md`,
+          examples: [],
+        });
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `✅ 커맨드 업로드 완료!\n\nID: ${cmdId}\n이름: ${cmdName}\n카테고리: ${category}\n\n이제 다른 사용자들도 이 커맨드를 설치할 수 있습니다.`,
+            },
+          ],
+        };
+      }
+
+      case "upload_mcp": {
+        const mcpData = args as {
+          id: string;
+          name: string;
+          description?: string;
+          category?: string;
+          type: string;
+          config: Record<string, unknown>;
+          installLocation?: string;
+          setupSteps?: string[];
+        };
+
+        // Upload to API
+        await postAPI("/mcp", {
+          id: mcpData.id,
+          name: mcpData.name,
+          description: mcpData.description || "",
+          category: mcpData.category || "Other",
+          type: mcpData.type,
+          config: mcpData.config,
+          installLocation: mcpData.installLocation || "global",
+          setupSteps: mcpData.setupSteps || [],
+          examples: [],
+        });
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `✅ MCP 서버 업로드 완료!\n\nID: ${mcpData.id}\n이름: ${mcpData.name}\n타입: ${mcpData.type}\n\n이제 다른 사용자들도 이 MCP 서버를 설치할 수 있습니다.`,
+            },
+          ],
+        };
+      }
+
+      case "upload_plugin": {
+        const pluginData = args as {
+          id: string;
+          name: string;
+          description?: string;
+          category?: string;
+          marketplace: string;
+          features?: string[];
+          agents?: string[];
+          skills?: string[];
+        };
+
+        // Upload to API
+        await postAPI("/plugins", {
+          id: pluginData.id,
+          name: pluginData.name,
+          description: pluginData.description || "",
+          category: pluginData.category || "Other",
+          marketplace: pluginData.marketplace,
+          installCommand: `/install-plugin ${pluginData.id}@${pluginData.marketplace}`,
+          features: pluginData.features || [],
+          agents: pluginData.agents || [],
+          skills: pluginData.skills || [],
+          examples: [],
+        });
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `✅ 플러그인 업로드 완료!\n\nID: ${pluginData.id}\n이름: ${pluginData.name}\n마켓플레이스: ${pluginData.marketplace}\n\n이제 다른 사용자들도 이 플러그인을 설치할 수 있습니다.`,
             },
           ],
         };
