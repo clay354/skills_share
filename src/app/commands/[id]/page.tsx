@@ -112,9 +112,9 @@ export default async function CommandDetailPage({ params }: PageProps) {
         </div>
 
         {/* Version History */}
-        {hasVersions && sortedVersions.length > 1 && (
-          <div className="border-t border-neutral-100 pt-8 mt-8">
-            <h2 className="font-medium text-black mb-4">Version History</h2>
+        <div className="border-t border-neutral-100 pt-8 mt-8">
+          <h2 className="font-medium text-black mb-4">Version History</h2>
+          {hasVersions && sortedVersions.length > 1 ? (
             <div className="space-y-3">
               {sortedVersions.map((ver) => {
                 const versionInstallPrompt = generateCommandInstallPrompt(command, ver.content);
@@ -161,8 +161,10 @@ export default async function CommandDetailPage({ params }: PageProps) {
                 );
               })}
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="text-sm text-neutral-400">버전 히스토리 없음</p>
+          )}
+        </div>
       </div>
     </div>
   );
