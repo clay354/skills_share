@@ -10,6 +10,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "1.2.0",
+    date: "2026-02-05",
+    title: "Redis 마이그레이션 및 작성자 추적",
+    changes: [
+      { type: "breaking", description: "Edge Config에서 Upstash Redis로 데이터 저장소 마이그레이션" },
+      { type: "feature", description: "업로드/업데이트 시 authorName 필수 입력으로 작성자 추적" },
+      { type: "feature", description: "웹페이지에 업데이트 날짜 및 작성자 표시" },
+      { type: "feature", description: "MCP 도구에 authorName 파라미터 추가 (upload/update)" },
+      { type: "improvement", description: "정적 데이터 제거, 모든 데이터를 Redis에서 관리" },
+      { type: "improvement", description: "MCP 상세 페이지에 Tools 섹션 추가" },
+    ]
+  },
+  {
     version: "1.1.0",
     date: "2026-02-05",
     title: "업데이트 기능 및 도구 설명 추가",
