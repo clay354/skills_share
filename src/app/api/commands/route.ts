@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import redis, { REDIS_KEYS } from '@/lib/redis';
-import { Command } from '@/data/commands';
+import { Command, CommandVersion } from '@/data/commands';
+import { getKoreanTimeISO } from '@/lib/utils';
 
 // Get all commands from Redis
 async function getAllCommands(): Promise<Command[]> {
@@ -15,6 +16,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
   const category = searchParams.get('category');
+  const version = searchParams.get('version');
 
   const commands = await getAllCommands();
 
@@ -24,6 +26,24 @@ export async function GET(request: Request) {
     if (!command) {
       return NextResponse.json({ error: 'Command not found' }, { status: 404 });
     }
+
+    // If version specified, return that version's content
+    if (version && command.versions) {
+      const versionNum = parseInt(version, 10);
+      const versionData = command.versions.find(v => v.version === versionNum);
+      if (!versionData) {
+        return NextResponse.json({ error: `Version ${version} not found` }, { status: 404 });
+      }
+      // Return command with specific version's content
+      return NextResponse.json({
+        ...command,
+        content: versionData.content,
+        updatedAt: versionData.updatedAt,
+        updatedBy: versionData.updatedBy,
+        requestedVersion: versionNum,
+      });
+    }
+
     return NextResponse.json(command);
   }
 
@@ -43,6 +63,7 @@ export async function GET(request: Request) {
     examples: c.examples,
     updatedAt: c.updatedAt,
     updatedBy: c.updatedBy,
+    currentVersion: c.currentVersion,
   }));
 
   return NextResponse.json(list);
@@ -76,7 +97,15 @@ export async function POST(request: Request) {
       );
     }
 
-    // Build complete command object
+    // Build complete command object with version 1
+    const now = getKoreanTimeISO();
+    const initialVersion: CommandVersion = {
+      version: 1,
+      content: newCommand.content,
+      updatedAt: now,
+      updatedBy: newCommand.authorName,
+    };
+
     const command: Command = {
       id: newCommand.id,
       name: newCommand.name,
@@ -85,8 +114,10 @@ export async function POST(request: Request) {
       content: newCommand.content,
       installPath: newCommand.installPath || `~/.claude/commands/${newCommand.id}.md`,
       examples: newCommand.examples || [],
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
       updatedBy: newCommand.authorName,
+      currentVersion: 1,
+      versions: [initialVersion],
     };
 
     // Add new command
@@ -106,7 +137,7 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const updateData = await request.json() as Partial<Command> & { authorName?: string };
+    const updateData = await request.json() as Partial<Command> & { authorName?: string; changelog?: string };
 
     // Validate required fields
     if (!updateData.id) {
@@ -134,8 +165,26 @@ export async function PUT(request: Request) {
       );
     }
 
-    // Merge with existing command
     const existingCommand = commands[existingIndex];
+    const now = getKoreanTimeISO();
+
+    // If content is being updated, create a new version
+    let newVersion: number = existingCommand.currentVersion || 1;
+    let versions = existingCommand.versions || [];
+
+    if (updateData.content && updateData.content !== existingCommand.content) {
+      newVersion = (existingCommand.currentVersion || 1) + 1;
+      const newVersionData: CommandVersion = {
+        version: newVersion,
+        content: updateData.content,
+        updatedAt: now,
+        updatedBy: updateData.authorName,
+        changelog: updateData.changelog,
+      };
+      versions = [...versions, newVersionData];
+    }
+
+    // Merge with existing command
     const updatedCommand: Command = {
       ...existingCommand,
       name: updateData.name || existingCommand.name,
@@ -144,8 +193,10 @@ export async function PUT(request: Request) {
       content: updateData.content || existingCommand.content,
       installPath: updateData.installPath || existingCommand.installPath,
       examples: updateData.examples || existingCommand.examples,
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
       updatedBy: updateData.authorName,
+      currentVersion: newVersion,
+      versions: versions,
     };
 
     // Replace in array
@@ -154,7 +205,12 @@ export async function PUT(request: Request) {
     // Update Redis
     await redis.set(REDIS_KEYS.commands, commands);
 
-    return NextResponse.json({ success: true, id: updatedCommand.id, message: 'Command updated successfully' });
+    return NextResponse.json({
+      success: true,
+      id: updatedCommand.id,
+      version: newVersion,
+      message: `Command updated successfully (v${newVersion})`
+    });
   } catch (error) {
     return NextResponse.json(
       { error: `Update failed: ${error instanceof Error ? error.message : String(error)}` },

@@ -1,3 +1,11 @@
+export interface MCPVersion {
+  version: number;
+  config: Record<string, unknown>;
+  updatedAt: string;
+  updatedBy: string;
+  changelog?: string;
+}
+
 export interface MCPServer {
   id: string;
   name: string;
@@ -11,4 +19,8 @@ export interface MCPServer {
   examples: { input: string; description: string }[];
   updatedAt?: string;
   updatedBy?: string;
+  // Version control (only for isOwned: true)
+  isOwned?: boolean;
+  currentVersion?: number;
+  versions?: MCPVersion[];
 }

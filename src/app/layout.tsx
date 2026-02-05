@@ -26,19 +26,19 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-sm border-b border-neutral-200">
+        <nav className="fixed top-0 left-0 right-0 z-50 bg-blue-800 border-b-4 border-blue-950">
           <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
-            <Link href="/" className="font-mono text-sm text-neutral-900 hover:text-black">
+            <Link href="/" className="font-bold text-yellow-300 hover:text-white tracking-wide">
               skills.share
             </Link>
-            <div className="flex items-center gap-6 text-sm">
-              <Link href="/commands" className="text-neutral-600 hover:text-black">
+            <div className="flex items-center gap-1">
+              <Link href="/commands" className="px-3 py-1.5 text-sm font-bold text-white bg-blue-700 border-2 border-blue-900 hover:bg-yellow-300 hover:text-blue-900 transition-colors">
                 cmd
               </Link>
-              <Link href="/plugins" className="text-neutral-600 hover:text-black">
+              <Link href="/plugins" className="px-3 py-1.5 text-sm font-bold text-white bg-blue-700 border-2 border-blue-900 hover:bg-yellow-300 hover:text-blue-900 transition-colors">
                 plugins
               </Link>
-              <Link href="/mcp" className="text-neutral-600 hover:text-black">
+              <Link href="/mcp" className="px-3 py-1.5 text-sm font-bold text-white bg-blue-700 border-2 border-blue-900 hover:bg-yellow-300 hover:text-blue-900 transition-colors">
                 mcp
               </Link>
             </div>

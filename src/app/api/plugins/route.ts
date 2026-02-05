@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import redis, { REDIS_KEYS } from '@/lib/redis';
 import { Plugin } from '@/data/plugins';
+import { getKoreanTimeISO } from '@/lib/utils';
 
 // Get all plugins from Redis
 async function getAllPlugins(): Promise<Plugin[]> {
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
       agents: newPlugin.agents || [],
       skills: newPlugin.skills || [],
       examples: newPlugin.examples || [],
-      updatedAt: new Date().toISOString(),
+      updatedAt: getKoreanTimeISO(),
       updatedBy: newPlugin.authorName,
     };
 
@@ -147,7 +148,7 @@ export async function PUT(request: Request) {
       agents: updateData.agents || existingPlugin.agents,
       skills: updateData.skills || existingPlugin.skills,
       examples: updateData.examples || existingPlugin.examples,
-      updatedAt: new Date().toISOString(),
+      updatedAt: getKoreanTimeISO(),
       updatedBy: updateData.authorName,
     };
 
