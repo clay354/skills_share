@@ -89,7 +89,7 @@ interface Plugin {
 const server = new Server(
   {
     name: "skills-share",
-    version: "1.1.0",
+    version: "1.2.0",
   },
   {
     capabilities: {
@@ -232,8 +232,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description: "커맨드 설명",
             },
+            authorName: {
+              type: "string",
+              description: "작성자 이름",
+            },
           },
-          required: ["file_path", "name", "category", "description"],
+          required: ["file_path", "name", "category", "description", "authorName"],
         },
       },
       {
@@ -277,8 +281,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               items: { type: "string" },
               description: "설정 단계 목록",
             },
+            authorName: {
+              type: "string",
+              description: "작성자 이름",
+            },
           },
-          required: ["id", "name", "type", "config"],
+          required: ["id", "name", "type", "config", "authorName"],
         },
       },
       {
@@ -322,8 +330,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               items: { type: "string" },
               description: "포함된 스킬 목록",
             },
+            authorName: {
+              type: "string",
+              description: "작성자 이름",
+            },
           },
-          required: ["id", "name", "marketplace"],
+          required: ["id", "name", "marketplace", "authorName"],
         },
       },
       {
@@ -352,8 +364,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description: "커맨드 설명 (선택사항)",
             },
+            authorName: {
+              type: "string",
+              description: "작성자 이름",
+            },
           },
-          required: ["id"],
+          required: ["id", "authorName"],
         },
       },
       {
@@ -397,8 +413,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               items: { type: "string" },
               description: "설정 단계 목록 (선택사항)",
             },
+            authorName: {
+              type: "string",
+              description: "작성자 이름",
+            },
           },
-          required: ["id"],
+          required: ["id", "authorName"],
         },
       },
       {
@@ -442,8 +462,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               items: { type: "string" },
               description: "포함된 스킬 목록 (선택사항)",
             },
+            authorName: {
+              type: "string",
+              description: "작성자 이름",
+            },
           },
-          required: ["id"],
+          required: ["id", "authorName"],
         },
       },
     ],
@@ -643,12 +667,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "upload_command": {
-        const { file_path, name: cmdName, category, description } = args as {
+        const { file_path, name: cmdName, category, description, authorName } = args as {
           file_path: string;
           id?: string;
           name: string;
           category: string;
           description: string;
+          authorName: string;
         };
 
         // Expand ~ to home directory
@@ -674,6 +699,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content,
           installPath: `~/.claude/commands/${cmdId}.md`,
           examples: [],
+          authorName,
         });
 
         return {
@@ -696,6 +722,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           config: Record<string, unknown>;
           installLocation?: string;
           setupSteps?: string[];
+          authorName: string;
         };
 
         // Upload to API
@@ -709,6 +736,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           installLocation: mcpData.installLocation || "global",
           setupSteps: mcpData.setupSteps || [],
           examples: [],
+          authorName: mcpData.authorName,
         });
 
         return {
@@ -731,6 +759,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           features?: string[];
           agents?: string[];
           skills?: string[];
+          authorName: string;
         };
 
         // Upload to API
@@ -745,6 +774,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           agents: pluginData.agents || [],
           skills: pluginData.skills || [],
           examples: [],
+          authorName: pluginData.authorName,
         });
 
         return {
@@ -758,15 +788,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "update_command": {
-        const { file_path, id, name: cmdName, category, description } = args as {
+        const { file_path, id, name: cmdName, category, description, authorName } = args as {
           file_path?: string;
           id: string;
           name?: string;
           category?: string;
           description?: string;
+          authorName: string;
         };
 
-        const updateData: Record<string, unknown> = { id };
+        const updateData: Record<string, unknown> = { id, authorName };
 
         // If file_path provided, read new content
         if (file_path) {
@@ -803,6 +834,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           config?: Record<string, unknown>;
           installLocation?: string;
           setupSteps?: string[];
+          authorName: string;
         };
 
         await putAPI("/mcp", mcpData);
@@ -827,6 +859,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           features?: string[];
           agents?: string[];
           skills?: string[];
+          authorName: string;
         };
 
         await putAPI("/plugins", pluginData);
