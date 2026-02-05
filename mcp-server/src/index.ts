@@ -38,6 +38,22 @@ async function postAPI(endpoint: string, data: unknown): Promise<unknown> {
   return result;
 }
 
+// API 호출 헬퍼 (PUT)
+async function putAPI(endpoint: string, data: unknown): Promise<unknown> {
+  const response = await fetch(`${API_BASE_URL}/api${endpoint}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error((result as { error?: string }).error || `API error: ${response.status}`);
+  }
+  return result;
+}
+
 interface Command {
   id: string;
   name: string;
@@ -308,6 +324,126 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
           },
           required: ["id", "name", "marketplace"],
+        },
+      },
+      {
+        name: "update_command",
+        description: "기존에 업로드한 커맨드를 업데이트합니다. 빌트인 커맨드는 업데이트할 수 없습니다.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            file_path: {
+              type: "string",
+              description: "업데이트할 커맨드 파일 경로 (예: ~/.claude/commands/my-command.md)",
+            },
+            id: {
+              type: "string",
+              description: "업데이트할 커맨드 ID",
+            },
+            name: {
+              type: "string",
+              description: "커맨드 이름 (선택사항)",
+            },
+            category: {
+              type: "string",
+              description: "카테고리 (선택사항)",
+            },
+            description: {
+              type: "string",
+              description: "커맨드 설명 (선택사항)",
+            },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "update_mcp",
+        description: "기존에 업로드한 MCP 서버를 업데이트합니다. 빌트인 MCP는 업데이트할 수 없습니다.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description: "업데이트할 MCP 서버 ID",
+            },
+            name: {
+              type: "string",
+              description: "MCP 서버 이름 (선택사항)",
+            },
+            description: {
+              type: "string",
+              description: "MCP 서버 설명 (선택사항)",
+            },
+            category: {
+              type: "string",
+              description: "카테고리 (선택사항)",
+            },
+            type: {
+              type: "string",
+              enum: ["stdio", "http", "sse"],
+              description: "MCP 타입 (선택사항)",
+            },
+            config: {
+              type: "object",
+              description: "MCP 설정 객체 (선택사항)",
+            },
+            installLocation: {
+              type: "string",
+              enum: ["global", "project"],
+              description: "설치 위치 (선택사항)",
+            },
+            setupSteps: {
+              type: "array",
+              items: { type: "string" },
+              description: "설정 단계 목록 (선택사항)",
+            },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "update_plugin",
+        description: "기존에 업로드한 플러그인을 업데이트합니다. 빌트인 플러그인은 업데이트할 수 없습니다.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description: "업데이트할 플러그인 ID",
+            },
+            name: {
+              type: "string",
+              description: "플러그인 이름 (선택사항)",
+            },
+            description: {
+              type: "string",
+              description: "플러그인 설명 (선택사항)",
+            },
+            category: {
+              type: "string",
+              description: "카테고리 (선택사항)",
+            },
+            marketplace: {
+              type: "string",
+              description: "마켓플레이스 이름 (선택사항)",
+            },
+            features: {
+              type: "array",
+              items: { type: "string" },
+              description: "주요 기능 목록 (선택사항)",
+            },
+            agents: {
+              type: "array",
+              items: { type: "string" },
+              description: "포함된 에이전트 목록 (선택사항)",
+            },
+            skills: {
+              type: "array",
+              items: { type: "string" },
+              description: "포함된 스킬 목록 (선택사항)",
+            },
+          },
+          required: ["id"],
         },
       },
     ],
@@ -616,6 +752,90 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: "text",
               text: `✅ 플러그인 업로드 완료!\n\nID: ${pluginData.id}\n이름: ${pluginData.name}\n마켓플레이스: ${pluginData.marketplace}\n\n이제 다른 사용자들도 이 플러그인을 설치할 수 있습니다.`,
+            },
+          ],
+        };
+      }
+
+      case "update_command": {
+        const { file_path, id, name: cmdName, category, description } = args as {
+          file_path?: string;
+          id: string;
+          name?: string;
+          category?: string;
+          description?: string;
+        };
+
+        const updateData: Record<string, unknown> = { id };
+
+        // If file_path provided, read new content
+        if (file_path) {
+          const expandedPath = file_path.replace(/^~/, os.homedir());
+          if (!fs.existsSync(expandedPath)) {
+            throw new Error(`파일을 찾을 수 없습니다: ${file_path}`);
+          }
+          updateData.content = fs.readFileSync(expandedPath, "utf-8");
+        }
+
+        if (cmdName) updateData.name = cmdName;
+        if (category) updateData.category = category;
+        if (description) updateData.description = description;
+
+        await putAPI("/commands", updateData);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `✅ 커맨드 업데이트 완료!\n\nID: ${id}\n\n업데이트된 필드: ${Object.keys(updateData).filter(k => k !== "id").join(", ") || "없음"}`,
+            },
+          ],
+        };
+      }
+
+      case "update_mcp": {
+        const mcpData = args as {
+          id: string;
+          name?: string;
+          description?: string;
+          category?: string;
+          type?: string;
+          config?: Record<string, unknown>;
+          installLocation?: string;
+          setupSteps?: string[];
+        };
+
+        await putAPI("/mcp", mcpData);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `✅ MCP 서버 업데이트 완료!\n\nID: ${mcpData.id}\n\n업데이트된 필드: ${Object.keys(mcpData).filter(k => k !== "id").join(", ") || "없음"}`,
+            },
+          ],
+        };
+      }
+
+      case "update_plugin": {
+        const pluginData = args as {
+          id: string;
+          name?: string;
+          description?: string;
+          category?: string;
+          marketplace?: string;
+          features?: string[];
+          agents?: string[];
+          skills?: string[];
+        };
+
+        await putAPI("/plugins", pluginData);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `✅ 플러그인 업데이트 완료!\n\nID: ${pluginData.id}\n\n업데이트된 필드: ${Object.keys(pluginData).filter(k => k !== "id").join(", ") || "없음"}`,
             },
           ],
         };
