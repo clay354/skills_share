@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import redis, { REDIS_KEYS } from '@/lib/redis';
 import { Command, CommandVersion } from '@/data/commands';
+import { getKoreanTimeISO } from '@/lib/utils';
 
 // Get all commands from Redis
 async function getAllCommands(): Promise<Command[]> {
@@ -97,7 +98,7 @@ export async function POST(request: Request) {
     }
 
     // Build complete command object with version 1
-    const now = new Date().toISOString();
+    const now = getKoreanTimeISO();
     const initialVersion: CommandVersion = {
       version: 1,
       content: newCommand.content,
@@ -165,7 +166,7 @@ export async function PUT(request: Request) {
     }
 
     const existingCommand = commands[existingIndex];
-    const now = new Date().toISOString();
+    const now = getKoreanTimeISO();
 
     // If content is being updated, create a new version
     let newVersion: number = existingCommand.currentVersion || 1;

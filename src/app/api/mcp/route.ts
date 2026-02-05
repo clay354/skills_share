@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import redis, { REDIS_KEYS } from '@/lib/redis';
 import { MCPServer } from '@/data/mcp';
+import { getKoreanTimeISO } from '@/lib/utils';
 
 // Get all MCP servers from Redis
 async function getAllMcpServers(): Promise<MCPServer[]> {
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
       setupSteps: newMcp.setupSteps || [],
       tools: newMcp.tools || [],
       examples: newMcp.examples || [],
-      updatedAt: new Date().toISOString(),
+      updatedAt: getKoreanTimeISO(),
       updatedBy: newMcp.authorName,
     };
 
@@ -154,7 +155,7 @@ export async function PUT(request: Request) {
       setupSteps: updateData.setupSteps || existingMcp.setupSteps,
       tools: updateData.tools || existingMcp.tools,
       examples: updateData.examples || existingMcp.examples,
-      updatedAt: new Date().toISOString(),
+      updatedAt: getKoreanTimeISO(),
       updatedBy: updateData.authorName,
     };
 

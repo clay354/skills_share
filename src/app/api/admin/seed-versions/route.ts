@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import redis, { REDIS_KEYS } from "@/lib/redis";
 import { Command, CommandVersion } from "@/data/commands";
+import { getKoreanTimeISO } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,7 @@ Download the specified website URL along with its assets (CSS, JS, images) to a 
       {
         version: 3,
         content: cloneCmd.content,
-        updatedAt: cloneCmd.updatedAt || new Date().toISOString(),
+        updatedAt: cloneCmd.updatedAt || getKoreanTimeISO(),
         updatedBy: cloneCmd.updatedBy || 'clay',
         changelog: '프롬프트 개선 및 에러 처리 강화',
       },

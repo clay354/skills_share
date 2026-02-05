@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import redis, { REDIS_KEYS } from "@/lib/redis";
 import { Command } from "@/data/commands";
+import { getKoreanTimeISO } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-const NOW = new Date().toISOString();
+const NOW = getKoreanTimeISO();
 
 const originalCommands: Command[] = [
   {
