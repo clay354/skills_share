@@ -34,13 +34,12 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero */}
-      <div className="max-w-2xl mx-auto px-6 pt-32 pb-16 text-center">
-        <h1 className="text-3xl md:text-4xl font-semibold text-black leading-tight mb-4">
-          Claude Code Extensions
-        </h1>
-        <p className="text-neutral-600 text-lg leading-relaxed">
-          Commands, Plugins, MCP Servers for Claude Code
-        </p>
+      <div className="max-w-2xl mx-auto px-6 pt-16 pb-8">
+        <img
+          src="/images/main_image.png"
+          alt="Claude Code Extensions"
+          className="w-full h-auto"
+        />
       </div>
 
       {/* Quick Install */}
