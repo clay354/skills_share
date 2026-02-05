@@ -49,8 +49,9 @@ ${plugin.installCommand}
 \`\`\``;
 }
 
-export function generateMCPInstallPrompt(mcp: MCPServer): string {
-  const configJson = JSON.stringify(mcp.config, null, 2);
+export function generateMCPInstallPrompt(mcp: MCPServer, versionConfig?: Record<string, unknown>): string {
+  const config = versionConfig || mcp.config;
+  const configJson = JSON.stringify(config, null, 2);
 
   if (mcp.installLocation === "global") {
     return `다음 MCP 서버를 전역 설정에 추가해주세요.

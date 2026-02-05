@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import redis, { REDIS_KEYS } from '@/lib/redis';
-import { MCPServer } from '@/data/mcp';
+import { MCPServer, MCPVersion } from '@/data/mcp';
 import { getKoreanTimeISO } from '@/lib/utils';
 
 // Get all MCP servers from Redis
@@ -81,6 +81,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const now = getKoreanTimeISO();
+
     // Build complete MCP object
     const mcp: MCPServer = {
       id: newMcp.id,
@@ -93,9 +95,21 @@ export async function POST(request: Request) {
       setupSteps: newMcp.setupSteps || [],
       tools: newMcp.tools || [],
       examples: newMcp.examples || [],
-      updatedAt: getKoreanTimeISO(),
+      updatedAt: now,
       updatedBy: newMcp.authorName,
+      isOwned: newMcp.isOwned,
     };
+
+    // If isOwned, initialize version tracking
+    if (newMcp.isOwned) {
+      mcp.currentVersion = 1;
+      mcp.versions = [{
+        version: 1,
+        config: newMcp.config,
+        updatedAt: now,
+        updatedBy: newMcp.authorName,
+      }];
+    }
 
     // Add new MCP server
     const updatedMcpServers = [...existingMcpServers, mcp];
@@ -144,19 +158,41 @@ export async function PUT(request: Request) {
 
     // Merge with existing MCP server
     const existingMcp = mcpServers[existingIndex];
+    const now = getKoreanTimeISO();
+    const newConfig = updateData.config || existingMcp.config;
+
+    // Version tracking for isOwned MCPs
+    let newVersion = existingMcp.currentVersion || 1;
+    let versions = existingMcp.versions || [];
+
+    if (existingMcp.isOwned && updateData.config &&
+        JSON.stringify(updateData.config) !== JSON.stringify(existingMcp.config)) {
+      newVersion = (existingMcp.currentVersion || 1) + 1;
+      const newVersionData: MCPVersion = {
+        version: newVersion,
+        config: updateData.config,
+        updatedAt: now,
+        updatedBy: updateData.authorName,
+        changelog: (updateData as { changelog?: string }).changelog,
+      };
+      versions = [...versions, newVersionData];
+    }
+
     const updatedMcp: MCPServer = {
       ...existingMcp,
       name: updateData.name || existingMcp.name,
       description: updateData.description ?? existingMcp.description,
       category: updateData.category || existingMcp.category,
       type: updateData.type || existingMcp.type,
-      config: updateData.config || existingMcp.config,
+      config: newConfig,
       installLocation: updateData.installLocation || existingMcp.installLocation,
       setupSteps: updateData.setupSteps || existingMcp.setupSteps,
       tools: updateData.tools || existingMcp.tools,
       examples: updateData.examples || existingMcp.examples,
-      updatedAt: getKoreanTimeISO(),
+      updatedAt: now,
       updatedBy: updateData.authorName,
+      currentVersion: existingMcp.isOwned ? newVersion : undefined,
+      versions: existingMcp.isOwned ? versions : undefined,
     };
 
     // Replace in array
