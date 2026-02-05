@@ -1,4 +1,8 @@
+import { config } from 'dotenv';
 import { Redis } from '@upstash/redis';
+
+// Load .env.local
+config({ path: '.env.local' });
 
 if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
   console.error('Missing environment variables!');
