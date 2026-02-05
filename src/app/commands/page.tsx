@@ -1,7 +1,20 @@
 import Link from "next/link";
-import { commands } from "@/data/commands";
+import { Command } from "@/data/commands";
+import redis, { REDIS_KEYS } from "@/lib/redis";
 
-export default function CommandsPage() {
+export const dynamic = "force-dynamic";
+
+async function getCommands(): Promise<Command[]> {
+  try {
+    return await redis.get<Command[]>(REDIS_KEYS.commands) || [];
+  } catch {
+    return [];
+  }
+}
+
+export default async function CommandsPage() {
+  const commands = await getCommands();
+
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-3xl mx-auto px-6 py-20">
