@@ -48,6 +48,7 @@ export async function GET(request: Request) {
     examples: m.examples,
     updatedAt: m.updatedAt,
     updatedBy: m.updatedBy,
+    isOwned: m.isOwned,
   }));
 
   return NextResponse.json(list);
