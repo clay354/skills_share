@@ -2,7 +2,8 @@ import { Command } from "@/data/commands";
 import { Plugin } from "@/data/plugins";
 import { MCPServer } from "@/data/mcp";
 
-export function generateCommandInstallPrompt(command: Command): string {
+export function generateCommandInstallPrompt(command: Command, versionContent?: string): string {
+  const content = versionContent || command.content;
   return `다음 커스텀 커맨드를 설치해주세요.
 
 ## 설치 경로
@@ -10,7 +11,7 @@ export function generateCommandInstallPrompt(command: Command): string {
 
 ## 파일 내용
 \`\`\`markdown
-${command.content}
+${content}
 \`\`\`
 
 위 내용을 \`${command.installPath}\` 경로에 저장해주세요. 디렉토리가 없으면 생성해주세요.`;
