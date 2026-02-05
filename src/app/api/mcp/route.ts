@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server';
 import redis, { REDIS_KEYS } from '@/lib/redis';
-import { mcpServers as builtInMcpServers, MCPServer } from '@/data/mcp';
+import { MCPServer } from '@/data/mcp';
 
-// Get all MCP servers (built-in + uploaded)
+// Get all MCP servers from Redis
 async function getAllMcpServers(): Promise<MCPServer[]> {
   try {
-    const uploadedMcpServers = await redis.get<MCPServer[]>(REDIS_KEYS.mcpServers) || [];
-    return [...builtInMcpServers, ...uploadedMcpServers];
+    return await redis.get<MCPServer[]>(REDIS_KEYS.mcpServers) || [];
   } catch {
-    // Redis not configured, return only built-in
-    return builtInMcpServers;
+    return [];
   }
 }
 
@@ -35,17 +33,40 @@ export async function GET(request: Request) {
     filtered = mcpServers.filter(m => m.category.toLowerCase() === category.toLowerCase());
   }
 
-  return NextResponse.json(filtered);
+  // Return list with update info
+  const list = filtered.map(m => ({
+    id: m.id,
+    name: m.name,
+    description: m.description,
+    category: m.category,
+    type: m.type,
+    config: m.config,
+    installLocation: m.installLocation,
+    setupSteps: m.setupSteps,
+    tools: m.tools,
+    examples: m.examples,
+    updatedAt: m.updatedAt,
+    updatedBy: m.updatedBy,
+  }));
+
+  return NextResponse.json(list);
 }
 
 export async function POST(request: Request) {
   try {
-    const newMcp = await request.json() as Partial<MCPServer>;
+    const newMcp = await request.json() as Partial<MCPServer> & { authorName?: string };
 
     // Validate required fields
     if (!newMcp.id || !newMcp.name || !newMcp.type || !newMcp.config) {
       return NextResponse.json(
         { error: 'Missing required fields: id, name, type, config' },
+        { status: 400 }
+      );
+    }
+
+    if (!newMcp.authorName) {
+      return NextResponse.json(
+        { error: 'Missing required field: authorName' },
         { status: 400 }
       );
     }
@@ -69,19 +90,14 @@ export async function POST(request: Request) {
       config: newMcp.config,
       installLocation: newMcp.installLocation || 'global',
       setupSteps: newMcp.setupSteps || [],
+      tools: newMcp.tools || [],
       examples: newMcp.examples || [],
+      updatedAt: new Date().toISOString(),
+      updatedBy: newMcp.authorName,
     };
 
-    // Get current uploaded MCP servers
-    let uploadedMcpServers: MCPServer[] = [];
-    try {
-      uploadedMcpServers = await redis.get<MCPServer[]>(REDIS_KEYS.mcpServers) || [];
-    } catch {
-      uploadedMcpServers = [];
-    }
-
     // Add new MCP server
-    const updatedMcpServers = [...uploadedMcpServers, mcp];
+    const updatedMcpServers = [...existingMcpServers, mcp];
 
     // Update Redis
     await redis.set(REDIS_KEYS.mcpServers, updatedMcpServers);
@@ -97,9 +113,9 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const updateData = await request.json() as Partial<MCPServer>;
+    const updateData = await request.json() as Partial<MCPServer> & { authorName?: string };
 
-    // Validate required field
+    // Validate required fields
     if (!updateData.id) {
       return NextResponse.json(
         { error: 'Missing required field: id' },
@@ -107,23 +123,16 @@ export async function PUT(request: Request) {
       );
     }
 
-    // Check if MCP server exists in uploaded servers (can't update built-in)
-    let uploadedMcpServers: MCPServer[] = [];
-    try {
-      uploadedMcpServers = await redis.get<MCPServer[]>(REDIS_KEYS.mcpServers) || [];
-    } catch {
-      uploadedMcpServers = [];
-    }
-
-    const existingIndex = uploadedMcpServers.findIndex(m => m.id === updateData.id);
-
-    // Check if it's a built-in MCP server
-    if (builtInMcpServers.some(m => m.id === updateData.id)) {
+    if (!updateData.authorName) {
       return NextResponse.json(
-        { error: `Cannot update built-in MCP server "${updateData.id}"` },
-        { status: 403 }
+        { error: 'Missing required field: authorName' },
+        { status: 400 }
       );
     }
+
+    // Get current MCP servers
+    const mcpServers = await getAllMcpServers();
+    const existingIndex = mcpServers.findIndex(m => m.id === updateData.id);
 
     if (existingIndex === -1) {
       return NextResponse.json(
@@ -133,7 +142,7 @@ export async function PUT(request: Request) {
     }
 
     // Merge with existing MCP server
-    const existingMcp = uploadedMcpServers[existingIndex];
+    const existingMcp = mcpServers[existingIndex];
     const updatedMcp: MCPServer = {
       ...existingMcp,
       name: updateData.name || existingMcp.name,
@@ -143,14 +152,17 @@ export async function PUT(request: Request) {
       config: updateData.config || existingMcp.config,
       installLocation: updateData.installLocation || existingMcp.installLocation,
       setupSteps: updateData.setupSteps || existingMcp.setupSteps,
+      tools: updateData.tools || existingMcp.tools,
       examples: updateData.examples || existingMcp.examples,
+      updatedAt: new Date().toISOString(),
+      updatedBy: updateData.authorName,
     };
 
     // Replace in array
-    uploadedMcpServers[existingIndex] = updatedMcp;
+    mcpServers[existingIndex] = updatedMcp;
 
     // Update Redis
-    await redis.set(REDIS_KEYS.mcpServers, uploadedMcpServers);
+    await redis.set(REDIS_KEYS.mcpServers, mcpServers);
 
     return NextResponse.json({ success: true, id: updatedMcp.id, message: 'MCP server updated successfully' });
   } catch (error) {

@@ -113,6 +113,14 @@ export default async function PluginDetailPage({ params }: PageProps) {
                 </div>
               </div>
             )}
+            {plugin.updatedAt && (
+              <div className="pt-2 border-t border-neutral-200">
+                <p className="text-sm text-neutral-500">
+                  Updated: {new Date(plugin.updatedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  {plugin.updatedBy && <span> by <span className="font-medium text-neutral-600">{plugin.updatedBy}</span></span>}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

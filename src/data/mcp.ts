@@ -9,4 +9,6 @@ export interface MCPServer {
   setupSteps?: string[];
   tools?: { name: string; description: string }[];
   examples: { input: string; description: string }[];
+  updatedAt?: string;
+  updatedBy?: string;
 }

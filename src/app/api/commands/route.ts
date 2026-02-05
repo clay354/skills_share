@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server';
 import redis, { REDIS_KEYS } from '@/lib/redis';
-import { commands as builtInCommands, Command } from '@/data/commands';
+import { Command } from '@/data/commands';
 
-// Get all commands (built-in + uploaded)
+// Get all commands from Redis
 async function getAllCommands(): Promise<Command[]> {
   try {
-    const uploadedCommands = await redis.get<Command[]>(REDIS_KEYS.commands) || [];
-    return [...builtInCommands, ...uploadedCommands];
+    return await redis.get<Command[]>(REDIS_KEYS.commands) || [];
   } catch {
-    // Redis not configured, return only built-in
-    return builtInCommands;
+    return [];
   }
 }
 
@@ -43,6 +41,8 @@ export async function GET(request: Request) {
     category: c.category,
     installPath: c.installPath,
     examples: c.examples,
+    updatedAt: c.updatedAt,
+    updatedBy: c.updatedBy,
   }));
 
   return NextResponse.json(list);
@@ -50,12 +50,19 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const newCommand = await request.json() as Partial<Command>;
+    const newCommand = await request.json() as Partial<Command> & { authorName?: string };
 
     // Validate required fields
     if (!newCommand.id || !newCommand.name || !newCommand.content || !newCommand.category) {
       return NextResponse.json(
         { error: 'Missing required fields: id, name, content, category' },
+        { status: 400 }
+      );
+    }
+
+    if (!newCommand.authorName) {
+      return NextResponse.json(
+        { error: 'Missing required field: authorName' },
         { status: 400 }
       );
     }
@@ -78,18 +85,12 @@ export async function POST(request: Request) {
       content: newCommand.content,
       installPath: newCommand.installPath || `~/.claude/commands/${newCommand.id}.md`,
       examples: newCommand.examples || [],
+      updatedAt: new Date().toISOString(),
+      updatedBy: newCommand.authorName,
     };
 
-    // Get current uploaded commands
-    let uploadedCommands: Command[] = [];
-    try {
-      uploadedCommands = await redis.get<Command[]>(REDIS_KEYS.commands) || [];
-    } catch {
-      uploadedCommands = [];
-    }
-
     // Add new command
-    const updatedCommands = [...uploadedCommands, command];
+    const updatedCommands = [...existingCommands, command];
 
     // Update Redis
     await redis.set(REDIS_KEYS.commands, updatedCommands);
@@ -105,9 +106,9 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const updateData = await request.json() as Partial<Command>;
+    const updateData = await request.json() as Partial<Command> & { authorName?: string };
 
-    // Validate required field
+    // Validate required fields
     if (!updateData.id) {
       return NextResponse.json(
         { error: 'Missing required field: id' },
@@ -115,23 +116,16 @@ export async function PUT(request: Request) {
       );
     }
 
-    // Check if command exists in uploaded commands (can't update built-in)
-    let uploadedCommands: Command[] = [];
-    try {
-      uploadedCommands = await redis.get<Command[]>(REDIS_KEYS.commands) || [];
-    } catch {
-      uploadedCommands = [];
-    }
-
-    const existingIndex = uploadedCommands.findIndex(c => c.id === updateData.id);
-
-    // Check if it's a built-in command
-    if (builtInCommands.some(c => c.id === updateData.id)) {
+    if (!updateData.authorName) {
       return NextResponse.json(
-        { error: `Cannot update built-in command "${updateData.id}"` },
-        { status: 403 }
+        { error: 'Missing required field: authorName' },
+        { status: 400 }
       );
     }
+
+    // Get current commands
+    const commands = await getAllCommands();
+    const existingIndex = commands.findIndex(c => c.id === updateData.id);
 
     if (existingIndex === -1) {
       return NextResponse.json(
@@ -141,7 +135,7 @@ export async function PUT(request: Request) {
     }
 
     // Merge with existing command
-    const existingCommand = uploadedCommands[existingIndex];
+    const existingCommand = commands[existingIndex];
     const updatedCommand: Command = {
       ...existingCommand,
       name: updateData.name || existingCommand.name,
@@ -150,13 +144,15 @@ export async function PUT(request: Request) {
       content: updateData.content || existingCommand.content,
       installPath: updateData.installPath || existingCommand.installPath,
       examples: updateData.examples || existingCommand.examples,
+      updatedAt: new Date().toISOString(),
+      updatedBy: updateData.authorName,
     };
 
     // Replace in array
-    uploadedCommands[existingIndex] = updatedCommand;
+    commands[existingIndex] = updatedCommand;
 
     // Update Redis
-    await redis.set(REDIS_KEYS.commands, uploadedCommands);
+    await redis.set(REDIS_KEYS.commands, commands);
 
     return NextResponse.json({ success: true, id: updatedCommand.id, message: 'Command updated successfully' });
   } catch (error) {

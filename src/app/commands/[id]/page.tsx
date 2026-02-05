@@ -82,6 +82,12 @@ export default async function CommandDetailPage({ params }: PageProps) {
             <p className="text-sm text-neutral-600 mb-4">
               Usage: <span className="font-mono">/{command.id}</span>
             </p>
+            {command.updatedAt && (
+              <p className="text-sm text-neutral-500 mb-2">
+                Updated: {new Date(command.updatedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {command.updatedBy && <span> by <span className="font-medium text-neutral-600">{command.updatedBy}</span></span>}
+              </p>
+            )}
             <details>
               <summary className="cursor-pointer text-sm text-neutral-500 hover:text-neutral-700">
                 View file content

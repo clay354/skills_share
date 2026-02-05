@@ -6,4 +6,6 @@ export interface Command {
   content: string;
   installPath: string;
   examples: { input: string; description: string }[];
+  updatedAt?: string;
+  updatedBy?: string;
 }

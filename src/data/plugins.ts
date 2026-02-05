@@ -9,6 +9,8 @@ export interface Plugin {
   agents?: string[];
   skills?: string[];
   examples: { input: string; description: string }[];
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 export interface Marketplace {
