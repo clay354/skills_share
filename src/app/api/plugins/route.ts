@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
-import { get } from '@vercel/edge-config';
+import redis, { REDIS_KEYS } from '@/lib/redis';
 import { plugins as builtInPlugins, Plugin } from '@/data/plugins';
 
 // Get all plugins (built-in + uploaded)
 async function getAllPlugins(): Promise<Plugin[]> {
   try {
-    const uploadedPlugins = await get<Plugin[]>('plugins') || [];
+    const uploadedPlugins = await redis.get<Plugin[]>(REDIS_KEYS.plugins) || [];
     return [...builtInPlugins, ...uploadedPlugins];
   } catch {
-    // Edge Config not configured, return only built-in
+    // Redis not configured, return only built-in
     return builtInPlugins;
   }
 }
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     // Get current uploaded plugins
     let uploadedPlugins: Plugin[] = [];
     try {
-      uploadedPlugins = await get<Plugin[]>('plugins') || [];
+      uploadedPlugins = await redis.get<Plugin[]>(REDIS_KEYS.plugins) || [];
     } catch {
       uploadedPlugins = [];
     }
@@ -77,38 +77,8 @@ export async function POST(request: Request) {
     // Add new plugin
     const updatedPlugins = [...uploadedPlugins, plugin];
 
-    // Update Edge Config via Vercel API
-    const edgeConfigId = process.env.EDGE_CONFIG_ID;
-    const vercelToken = process.env.VERCEL_API_TOKEN;
-
-    if (!edgeConfigId || !vercelToken) {
-      return NextResponse.json(
-        { error: 'Server not configured for uploads (missing EDGE_CONFIG_ID or VERCEL_API_TOKEN)' },
-        { status: 500 }
-      );
-    }
-
-    const response = await fetch(
-      `https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${vercelToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          items: [{ operation: 'upsert', key: 'plugins', value: updatedPlugins }],
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return NextResponse.json(
-        { error: `Failed to update Edge Config: ${errorText}` },
-        { status: 500 }
-      );
-    }
+    // Update Redis
+    await redis.set(REDIS_KEYS.plugins, updatedPlugins);
 
     return NextResponse.json({ success: true, id: plugin.id, message: 'Plugin uploaded successfully' });
   } catch (error) {
@@ -134,7 +104,7 @@ export async function PUT(request: Request) {
     // Check if plugin exists in uploaded plugins (can't update built-in)
     let uploadedPlugins: Plugin[] = [];
     try {
-      uploadedPlugins = await get<Plugin[]>('plugins') || [];
+      uploadedPlugins = await redis.get<Plugin[]>(REDIS_KEYS.plugins) || [];
     } catch {
       uploadedPlugins = [];
     }
@@ -174,38 +144,8 @@ export async function PUT(request: Request) {
     // Replace in array
     uploadedPlugins[existingIndex] = updatedPlugin;
 
-    // Update Edge Config via Vercel API
-    const edgeConfigId = process.env.EDGE_CONFIG_ID;
-    const vercelToken = process.env.VERCEL_API_TOKEN;
-
-    if (!edgeConfigId || !vercelToken) {
-      return NextResponse.json(
-        { error: 'Server not configured for uploads (missing EDGE_CONFIG_ID or VERCEL_API_TOKEN)' },
-        { status: 500 }
-      );
-    }
-
-    const response = await fetch(
-      `https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${vercelToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          items: [{ operation: 'upsert', key: 'plugins', value: uploadedPlugins }],
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return NextResponse.json(
-        { error: `Failed to update Edge Config: ${errorText}` },
-        { status: 500 }
-      );
-    }
+    // Update Redis
+    await redis.set(REDIS_KEYS.plugins, uploadedPlugins);
 
     return NextResponse.json({ success: true, id: updatedPlugin.id, message: 'Plugin updated successfully' });
   } catch (error) {

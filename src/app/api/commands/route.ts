@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
-import { get } from '@vercel/edge-config';
+import redis, { REDIS_KEYS } from '@/lib/redis';
 import { commands as builtInCommands, Command } from '@/data/commands';
 
 // Get all commands (built-in + uploaded)
 async function getAllCommands(): Promise<Command[]> {
   try {
-    const uploadedCommands = await get<Command[]>('commands') || [];
+    const uploadedCommands = await redis.get<Command[]>(REDIS_KEYS.commands) || [];
     return [...builtInCommands, ...uploadedCommands];
   } catch {
-    // Edge Config not configured, return only built-in
+    // Redis not configured, return only built-in
     return builtInCommands;
   }
 }
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     // Get current uploaded commands
     let uploadedCommands: Command[] = [];
     try {
-      uploadedCommands = await get<Command[]>('commands') || [];
+      uploadedCommands = await redis.get<Command[]>(REDIS_KEYS.commands) || [];
     } catch {
       uploadedCommands = [];
     }
@@ -91,38 +91,8 @@ export async function POST(request: Request) {
     // Add new command
     const updatedCommands = [...uploadedCommands, command];
 
-    // Update Edge Config via Vercel API
-    const edgeConfigId = process.env.EDGE_CONFIG_ID;
-    const vercelToken = process.env.VERCEL_API_TOKEN;
-
-    if (!edgeConfigId || !vercelToken) {
-      return NextResponse.json(
-        { error: 'Server not configured for uploads (missing EDGE_CONFIG_ID or VERCEL_API_TOKEN)' },
-        { status: 500 }
-      );
-    }
-
-    const response = await fetch(
-      `https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${vercelToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          items: [{ operation: 'upsert', key: 'commands', value: updatedCommands }],
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return NextResponse.json(
-        { error: `Failed to update Edge Config: ${errorText}` },
-        { status: 500 }
-      );
-    }
+    // Update Redis
+    await redis.set(REDIS_KEYS.commands, updatedCommands);
 
     return NextResponse.json({ success: true, id: command.id, message: 'Command uploaded successfully' });
   } catch (error) {
@@ -148,7 +118,7 @@ export async function PUT(request: Request) {
     // Check if command exists in uploaded commands (can't update built-in)
     let uploadedCommands: Command[] = [];
     try {
-      uploadedCommands = await get<Command[]>('commands') || [];
+      uploadedCommands = await redis.get<Command[]>(REDIS_KEYS.commands) || [];
     } catch {
       uploadedCommands = [];
     }
@@ -185,38 +155,8 @@ export async function PUT(request: Request) {
     // Replace in array
     uploadedCommands[existingIndex] = updatedCommand;
 
-    // Update Edge Config via Vercel API
-    const edgeConfigId = process.env.EDGE_CONFIG_ID;
-    const vercelToken = process.env.VERCEL_API_TOKEN;
-
-    if (!edgeConfigId || !vercelToken) {
-      return NextResponse.json(
-        { error: 'Server not configured for uploads (missing EDGE_CONFIG_ID or VERCEL_API_TOKEN)' },
-        { status: 500 }
-      );
-    }
-
-    const response = await fetch(
-      `https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${vercelToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          items: [{ operation: 'upsert', key: 'commands', value: uploadedCommands }],
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return NextResponse.json(
-        { error: `Failed to update Edge Config: ${errorText}` },
-        { status: 500 }
-      );
-    }
+    // Update Redis
+    await redis.set(REDIS_KEYS.commands, uploadedCommands);
 
     return NextResponse.json({ success: true, id: updatedCommand.id, message: 'Command updated successfully' });
   } catch (error) {

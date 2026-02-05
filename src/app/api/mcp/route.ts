@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
-import { get } from '@vercel/edge-config';
+import redis, { REDIS_KEYS } from '@/lib/redis';
 import { mcpServers as builtInMcpServers, MCPServer } from '@/data/mcp';
 
 // Get all MCP servers (built-in + uploaded)
 async function getAllMcpServers(): Promise<MCPServer[]> {
   try {
-    const uploadedMcpServers = await get<MCPServer[]>('mcpServers') || [];
+    const uploadedMcpServers = await redis.get<MCPServer[]>(REDIS_KEYS.mcpServers) || [];
     return [...builtInMcpServers, ...uploadedMcpServers];
   } catch {
-    // Edge Config not configured, return only built-in
+    // Redis not configured, return only built-in
     return builtInMcpServers;
   }
 }
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     // Get current uploaded MCP servers
     let uploadedMcpServers: MCPServer[] = [];
     try {
-      uploadedMcpServers = await get<MCPServer[]>('mcpServers') || [];
+      uploadedMcpServers = await redis.get<MCPServer[]>(REDIS_KEYS.mcpServers) || [];
     } catch {
       uploadedMcpServers = [];
     }
@@ -83,38 +83,8 @@ export async function POST(request: Request) {
     // Add new MCP server
     const updatedMcpServers = [...uploadedMcpServers, mcp];
 
-    // Update Edge Config via Vercel API
-    const edgeConfigId = process.env.EDGE_CONFIG_ID;
-    const vercelToken = process.env.VERCEL_API_TOKEN;
-
-    if (!edgeConfigId || !vercelToken) {
-      return NextResponse.json(
-        { error: 'Server not configured for uploads (missing EDGE_CONFIG_ID or VERCEL_API_TOKEN)' },
-        { status: 500 }
-      );
-    }
-
-    const response = await fetch(
-      `https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${vercelToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          items: [{ operation: 'upsert', key: 'mcpServers', value: updatedMcpServers }],
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return NextResponse.json(
-        { error: `Failed to update Edge Config: ${errorText}` },
-        { status: 500 }
-      );
-    }
+    // Update Redis
+    await redis.set(REDIS_KEYS.mcpServers, updatedMcpServers);
 
     return NextResponse.json({ success: true, id: mcp.id, message: 'MCP server uploaded successfully' });
   } catch (error) {
@@ -140,7 +110,7 @@ export async function PUT(request: Request) {
     // Check if MCP server exists in uploaded servers (can't update built-in)
     let uploadedMcpServers: MCPServer[] = [];
     try {
-      uploadedMcpServers = await get<MCPServer[]>('mcpServers') || [];
+      uploadedMcpServers = await redis.get<MCPServer[]>(REDIS_KEYS.mcpServers) || [];
     } catch {
       uploadedMcpServers = [];
     }
@@ -179,38 +149,8 @@ export async function PUT(request: Request) {
     // Replace in array
     uploadedMcpServers[existingIndex] = updatedMcp;
 
-    // Update Edge Config via Vercel API
-    const edgeConfigId = process.env.EDGE_CONFIG_ID;
-    const vercelToken = process.env.VERCEL_API_TOKEN;
-
-    if (!edgeConfigId || !vercelToken) {
-      return NextResponse.json(
-        { error: 'Server not configured for uploads (missing EDGE_CONFIG_ID or VERCEL_API_TOKEN)' },
-        { status: 500 }
-      );
-    }
-
-    const response = await fetch(
-      `https://api.vercel.com/v1/edge-config/${edgeConfigId}/items`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${vercelToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          items: [{ operation: 'upsert', key: 'mcpServers', value: uploadedMcpServers }],
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return NextResponse.json(
-        { error: `Failed to update Edge Config: ${errorText}` },
-        { status: 500 }
-      );
-    }
+    // Update Redis
+    await redis.set(REDIS_KEYS.mcpServers, uploadedMcpServers);
 
     return NextResponse.json({ success: true, id: updatedMcp.id, message: 'MCP server updated successfully' });
   } catch (error) {
