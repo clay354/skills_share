@@ -105,6 +105,11 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-neutral-200 py-8">
         <div className="max-w-2xl mx-auto px-6 text-center">
+          <div className="flex items-center justify-center gap-4 mb-2">
+            <Link href="/changelog" className="text-sm text-neutral-500 hover:text-black">
+              Changelog
+            </Link>
+          </div>
           <p className="text-sm text-neutral-400">Made with Claude Code</p>
         </div>
       </footer>
