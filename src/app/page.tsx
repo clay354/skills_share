@@ -66,6 +66,11 @@ export default async function Home() {
                       {cmd.category}
                     </span>
                   </div>
+                  {cmd.updatedAt && (
+                    <p className="text-xs text-neutral-400 mt-2">
+                      {new Date(cmd.updatedAt).toLocaleDateString('ko-KR')} · {cmd.updatedBy}
+                    </p>
+                  )}
                 </div>
               </Link>
             ))}
@@ -91,9 +96,12 @@ export default async function Home() {
                     </span>
                   </div>
                   <p className="text-sm text-neutral-600 mb-3">{plugin.description}</p>
-                  <p className="text-xs text-neutral-400">
-                    {plugin.agents?.length || 0} agents · {plugin.skills?.length || 0} skills
-                  </p>
+                  <div className="flex items-center justify-between text-xs text-neutral-400">
+                    <span>{plugin.agents?.length || 0} agents · {plugin.skills?.length || 0} skills</span>
+                    {plugin.updatedAt && (
+                      <span>{new Date(plugin.updatedAt).toLocaleDateString('ko-KR')} · {plugin.updatedBy}</span>
+                    )}
+                  </div>
                 </div>
               </Link>
             ))}
@@ -121,6 +129,11 @@ export default async function Home() {
                       {mcp.category}
                     </span>
                   </div>
+                  {mcp.updatedAt && (
+                    <p className="text-xs text-neutral-400 mt-2">
+                      {new Date(mcp.updatedAt).toLocaleDateString('ko-KR')} · {mcp.updatedBy}
+                    </p>
+                  )}
                 </div>
               </Link>
             ))}
