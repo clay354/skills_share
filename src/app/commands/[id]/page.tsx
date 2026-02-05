@@ -77,9 +77,43 @@ export default async function CommandDetailPage({ params }: PageProps) {
           />
         </div>
 
+        {/* Examples */}
+        <div className="mb-8">
+          <h2 className="font-medium text-black mb-4">Examples</h2>
+          <div className="space-y-3">
+            {command.examples.map((ex, i) => (
+              <div key={i} className="bg-neutral-50 rounded-xl p-4">
+                <p className="text-sm text-black mb-1">{ex.description}</p>
+                <p className="text-xs text-neutral-500 font-mono">{ex.input}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Details */}
+        <div className="border-t border-neutral-100 pt-8">
+          <h2 className="font-medium text-black mb-4">Details</h2>
+          <div className="bg-neutral-50 rounded-xl p-4">
+            <p className="text-sm text-neutral-600 mb-2">
+              Path: <span className="font-mono">{command.installPath}</span>
+            </p>
+            <p className="text-sm text-neutral-600 mb-4">
+              Usage: <span className="font-mono">/{command.id}</span>
+            </p>
+            <details>
+              <summary className="cursor-pointer text-sm text-neutral-500 hover:text-neutral-700">
+                View current file content
+              </summary>
+              <pre className="mt-3 p-3 bg-white border rounded text-xs text-neutral-600 overflow-x-auto max-h-64">
+                {command.content}
+              </pre>
+            </details>
+          </div>
+        </div>
+
         {/* Version History */}
         {hasVersions && sortedVersions.length > 1 && (
-          <div className="mb-8">
+          <div className="border-t border-neutral-100 pt-8 mt-8">
             <h2 className="font-medium text-black mb-4">Version History</h2>
             <div className="space-y-3">
               {sortedVersions.map((ver) => {
@@ -129,40 +163,6 @@ export default async function CommandDetailPage({ params }: PageProps) {
             </div>
           </div>
         )}
-
-        {/* Examples */}
-        <div className="mb-8">
-          <h2 className="font-medium text-black mb-4">Examples</h2>
-          <div className="space-y-3">
-            {command.examples.map((ex, i) => (
-              <div key={i} className="bg-neutral-50 rounded-xl p-4">
-                <p className="text-sm text-black mb-1">{ex.description}</p>
-                <p className="text-xs text-neutral-500 font-mono">{ex.input}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Details */}
-        <div className="border-t border-neutral-100 pt-8">
-          <h2 className="font-medium text-black mb-4">Details</h2>
-          <div className="bg-neutral-50 rounded-xl p-4">
-            <p className="text-sm text-neutral-600 mb-2">
-              Path: <span className="font-mono">{command.installPath}</span>
-            </p>
-            <p className="text-sm text-neutral-600 mb-4">
-              Usage: <span className="font-mono">/{command.id}</span>
-            </p>
-            <details>
-              <summary className="cursor-pointer text-sm text-neutral-500 hover:text-neutral-700">
-                View current file content
-              </summary>
-              <pre className="mt-3 p-3 bg-white border rounded text-xs text-neutral-600 overflow-x-auto max-h-64">
-                {command.content}
-              </pre>
-            </details>
-          </div>
-        </div>
       </div>
     </div>
   );
