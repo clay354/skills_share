@@ -99,29 +99,41 @@ export function generateHookInstallPrompt(hook: Hook): string {
 
   const configJson = JSON.stringify(hookConfig, null, 2);
 
-  return `다음 Hook을 설정에 추가해주세요.
+  let prompt = `다음 Hook을 설치해주세요.
 
 ## Hook 정보
 - **이름**: ${hook.name}
 - **이벤트**: ${hook.event}
 ${hook.matcher ? `- **매처**: ${hook.matcher}` : ""}
+`;
 
+  // 스크립트 파일이 있으면 먼저 파일 생성 안내
+  if (hook.scriptContent && hook.scriptPath) {
+    prompt += `
+## 1. 스크립트 파일 생성
+
+\`${hook.scriptPath}\` 경로에 다음 내용을 저장해주세요. 디렉토리가 없으면 생성해주세요.
+
+\`\`\`
+${hook.scriptContent}
+\`\`\`
+
+## 2. Hook 설정 추가
+`;
+  } else {
+    prompt += `
 ## 설치 방법
+`;
+  }
 
+  prompt += `
 \`~/.claude/settings.json\` 파일의 \`hooks\` 배열에 다음을 추가하세요:
 
 \`\`\`json
 ${configJson}
 \`\`\`
 
-## 전체 설정 예시
-\`\`\`json
-{
-  "hooks": [
-    ${configJson}
-  ]
-}
-\`\`\`
-
 설정 파일 수정 후 Claude Code를 재시작하면 Hook이 활성화됩니다.`;
+
+  return prompt;
 }
