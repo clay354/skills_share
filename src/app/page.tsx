@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Command } from "@/data/commands";
 import { Plugin } from "@/data/plugins";
 import { MCPServer } from "@/data/mcp";
+import { Hook } from "@/data/hooks";
 import { QuickInstall } from "@/components/QuickInstall";
 import redis, { REDIS_KEYS } from "@/lib/redis";
 
@@ -9,28 +10,31 @@ export const dynamic = "force-dynamic";
 
 async function getAllData() {
   try {
-    const [allCommands, allPlugins, allMcpServers] = await Promise.all([
+    const [allCommands, allPlugins, allMcpServers, allHooks] = await Promise.all([
       redis.get<Command[]>(REDIS_KEYS.commands),
       redis.get<Plugin[]>(REDIS_KEYS.plugins),
       redis.get<MCPServer[]>(REDIS_KEYS.mcpServers),
+      redis.get<Hook[]>(REDIS_KEYS.hooks),
     ]);
 
     return {
       allCommands: allCommands || [],
       allPlugins: allPlugins || [],
       allMcpServers: allMcpServers || [],
+      allHooks: allHooks || [],
     };
   } catch {
     return {
       allCommands: [],
       allPlugins: [],
       allMcpServers: [],
+      allHooks: [],
     };
   }
 }
 
 export default async function Home() {
-  const { allCommands, allPlugins, allMcpServers } = await getAllData();
+  const { allCommands, allPlugins, allMcpServers, allHooks } = await getAllData();
   return (
     <div className="min-h-screen bg-amber-50">
       {/* Hero */}
@@ -131,6 +135,43 @@ export default async function Home() {
                   {mcp.updatedAt && (
                     <p className="text-xs text-purple-500 mt-2 font-medium">
                       {new Date(mcp.updatedAt).toLocaleDateString('ko-KR')} · {mcp.updatedBy}
+                    </p>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Hooks */}
+      <section className="border-t border-neutral-100">
+        <div className="max-w-2xl mx-auto px-6 py-12">
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-black mb-2">Hooks</h2>
+            <p className="text-neutral-500 text-sm">Event-driven automation scripts</p>
+          </div>
+          <div className="space-y-3">
+            {allHooks.map((hook) => (
+              <Link key={hook.id} href={`/hooks/${hook.id}`}>
+                <div className="p-4 border border-neutral-200 rounded-xl hover:border-neutral-300 hover:bg-neutral-50 transition-all">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="font-medium text-black mb-1">{hook.name}</h3>
+                      <p className="text-sm text-neutral-600">{hook.description}</p>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <span className="text-xs px-2 py-1 bg-orange-50 text-orange-600 rounded">
+                        {hook.category}
+                      </span>
+                      <span className="text-xs px-2 py-1 bg-yellow-50 text-yellow-700 rounded">
+                        {hook.event}
+                      </span>
+                    </div>
+                  </div>
+                  {hook.updatedAt && (
+                    <p className="text-xs text-neutral-400 mt-2">
+                      {new Date(hook.updatedAt).toLocaleDateString('ko-KR')} · {hook.updatedBy}
                     </p>
                   )}
                 </div>

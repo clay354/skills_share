@@ -86,6 +86,18 @@ interface Plugin {
   skills?: string[];
 }
 
+interface Hook {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  event: string;
+  matcher?: string;
+  command: string;
+  timeout?: number;
+  examples: { input: string; description: string }[];
+}
+
 const server = new Server(
   {
     name: "skills-share",
@@ -470,6 +482,146 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["id", "authorName"],
         },
       },
+      {
+        name: "list_hooks",
+        description: "사용 가능한 Hook 목록을 조회합니다.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            category: {
+              type: "string",
+              description: "필터링할 카테고리 (선택사항)",
+            },
+            event: {
+              type: "string",
+              enum: ["PreToolUse", "PostToolUse", "Notification", "Stop"],
+              description: "필터링할 이벤트 타입 (선택사항)",
+            },
+          },
+        },
+      },
+      {
+        name: "get_hook_detail",
+        description: "특정 Hook의 상세 정보를 조회합니다.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description: "Hook ID",
+            },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "install_hook",
+        description: "Hook 설정을 출력합니다. 사용자가 직접 settings.json에 추가해야 합니다.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description: "설치할 Hook ID",
+            },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "upload_hook",
+        description: "Hook을 Skills Share에 업로드합니다.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description: "Hook ID",
+            },
+            name: {
+              type: "string",
+              description: "Hook 이름",
+            },
+            description: {
+              type: "string",
+              description: "Hook 설명",
+            },
+            category: {
+              type: "string",
+              description: "카테고리",
+            },
+            event: {
+              type: "string",
+              enum: ["PreToolUse", "PostToolUse", "Notification", "Stop"],
+              description: "이벤트 타입",
+            },
+            matcher: {
+              type: "string",
+              description: "매처 패턴 (선택사항)",
+            },
+            command: {
+              type: "string",
+              description: "실행할 명령어",
+            },
+            timeout: {
+              type: "number",
+              description: "타임아웃 (밀리초, 선택사항)",
+            },
+            authorName: {
+              type: "string",
+              description: "작성자 이름",
+            },
+          },
+          required: ["id", "name", "event", "command", "authorName"],
+        },
+      },
+      {
+        name: "update_hook",
+        description: "기존에 업로드한 Hook을 업데이트합니다.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description: "업데이트할 Hook ID",
+            },
+            name: {
+              type: "string",
+              description: "Hook 이름 (선택사항)",
+            },
+            description: {
+              type: "string",
+              description: "Hook 설명 (선택사항)",
+            },
+            category: {
+              type: "string",
+              description: "카테고리 (선택사항)",
+            },
+            event: {
+              type: "string",
+              enum: ["PreToolUse", "PostToolUse", "Notification", "Stop"],
+              description: "이벤트 타입 (선택사항)",
+            },
+            matcher: {
+              type: "string",
+              description: "매처 패턴 (선택사항)",
+            },
+            command: {
+              type: "string",
+              description: "실행할 명령어 (선택사항)",
+            },
+            timeout: {
+              type: "number",
+              description: "타임아웃 (밀리초, 선택사항)",
+            },
+            authorName: {
+              type: "string",
+              description: "작성자 이름",
+            },
+          },
+          required: ["id", "authorName"],
+        },
+      },
     ],
   };
 });
@@ -602,10 +754,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const results: Array<{ type: string; id: string; name: string; description: string }> = [];
 
         // Fetch all data
-        const [commands, mcpServers, plugins] = await Promise.all([
+        const [commands, mcpServers, plugins, hooks] = await Promise.all([
           fetchAPI("/commands") as Promise<Command[]>,
           fetchAPI("/mcp") as Promise<MCPServer[]>,
           fetchAPI("/plugins") as Promise<Plugin[]>,
+          fetchAPI("/hook") as Promise<Hook[]>,
         ]);
 
         commands.forEach((c) => {
@@ -649,6 +802,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               id: p.id,
               name: p.name,
               description: p.description,
+            });
+          }
+        });
+
+        hooks.forEach((h) => {
+          if (
+            h.name.toLowerCase().includes(query) ||
+            h.description.toLowerCase().includes(query) ||
+            h.id.toLowerCase().includes(query)
+          ) {
+            results.push({
+              type: "hook",
+              id: h.id,
+              name: h.name,
+              description: h.description,
             });
           }
         });
@@ -869,6 +1037,125 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: "text",
               text: `✅ 플러그인 업데이트 완료!\n\nID: ${pluginData.id}\n\n업데이트된 필드: ${Object.keys(pluginData).filter(k => k !== "id").join(", ") || "없음"}`,
+            },
+          ],
+        };
+      }
+
+      case "list_hooks": {
+        const category = (args as { category?: string; event?: string }).category;
+        const event = (args as { category?: string; event?: string }).event;
+        let endpoint = "/hook";
+        const params: string[] = [];
+        if (category) params.push(`category=${encodeURIComponent(category)}`);
+        if (event) params.push(`event=${encodeURIComponent(event)}`);
+        if (params.length > 0) endpoint += `?${params.join("&")}`;
+        const hooks = await fetchAPI(endpoint) as Hook[];
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(hooks, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "get_hook_detail": {
+        const id = (args as { id: string }).id;
+        const hook = await fetchAPI(`/hook?id=${encodeURIComponent(id)}`) as Hook;
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(hook, null, 2),
+            },
+          ],
+        };
+      }
+
+      case "install_hook": {
+        const id = (args as { id: string }).id;
+        const hook = await fetchAPI(`/hook?id=${encodeURIComponent(id)}`) as Hook;
+
+        const hookConfig = {
+          type: hook.event,
+          ...(hook.matcher && { matcher: hook.matcher }),
+          command: hook.command,
+          ...(hook.timeout && { timeout: hook.timeout }),
+        };
+
+        let instructions = `📦 ${hook.name} Hook 설치 가이드\n\n`;
+        instructions += `설정 위치: ~/.claude/settings.json\n\n`;
+        instructions += `hooks 배열에 추가할 설정:\n\`\`\`json\n${JSON.stringify(hookConfig, null, 2)}\n\`\`\`\n\n`;
+        instructions += `전체 설정 예시:\n\`\`\`json\n{\n  "hooks": [\n    ${JSON.stringify(hookConfig, null, 2).split('\n').join('\n    ')}\n  ]\n}\n\`\`\``;
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: instructions,
+            },
+          ],
+        };
+      }
+
+      case "upload_hook": {
+        const hookData = args as {
+          id: string;
+          name: string;
+          description?: string;
+          category?: string;
+          event: string;
+          matcher?: string;
+          command: string;
+          timeout?: number;
+          authorName: string;
+        };
+
+        await postAPI("/hook", {
+          id: hookData.id,
+          name: hookData.name,
+          description: hookData.description || "",
+          category: hookData.category || "Other",
+          event: hookData.event,
+          matcher: hookData.matcher,
+          command: hookData.command,
+          timeout: hookData.timeout,
+          examples: [],
+          authorName: hookData.authorName,
+        });
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `✅ Hook 업로드 완료!\n\nID: ${hookData.id}\n이름: ${hookData.name}\n이벤트: ${hookData.event}\n\n이제 다른 사용자들도 이 Hook을 설치할 수 있습니다.`,
+            },
+          ],
+        };
+      }
+
+      case "update_hook": {
+        const hookData = args as {
+          id: string;
+          name?: string;
+          description?: string;
+          category?: string;
+          event?: string;
+          matcher?: string;
+          command?: string;
+          timeout?: number;
+          authorName: string;
+        };
+
+        await putAPI("/hook", hookData);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `✅ Hook 업데이트 완료!\n\nID: ${hookData.id}\n\n업데이트된 필드: ${Object.keys(hookData).filter(k => k !== "id").join(", ") || "없음"}`,
             },
           ],
         };
