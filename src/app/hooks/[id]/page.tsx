@@ -111,8 +111,31 @@ export default async function HookDetailPage({ params }: PageProps) {
                 <p className="text-sm font-mono text-black">{hook.timeout}ms</p>
               </div>
             )}
+            {hook.scriptPath && (
+              <div>
+                <p className="text-sm text-neutral-500">Script Path</p>
+                <p className="text-sm font-mono text-black">{hook.scriptPath}</p>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Script Content */}
+        {hook.scriptContent && (
+          <div className="border-t border-neutral-100 pt-8 mt-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-medium text-black">Script Content</h2>
+              <CopyButton
+                text={hook.scriptContent}
+                label="Copy Script"
+                className="text-sm"
+              />
+            </div>
+            <pre className="bg-neutral-900 text-neutral-100 rounded-xl p-4 text-sm font-mono overflow-x-auto max-h-96 overflow-y-auto">
+              {hook.scriptContent}
+            </pre>
+          </div>
+        )}
       </div>
     </div>
   );
