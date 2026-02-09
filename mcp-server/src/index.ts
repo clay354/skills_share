@@ -94,6 +94,8 @@ interface Hook {
   event: string;
   matcher?: string;
   command: string;
+  scriptContent?: string;
+  scriptPath?: string;
   timeout?: number;
   examples: { input: string; description: string }[];
 }
@@ -101,7 +103,7 @@ interface Hook {
 const server = new Server(
   {
     name: "skills-share",
-    version: "1.3.0",
+    version: "1.4.0",
   },
   {
     capabilities: {
@@ -530,7 +532,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "upload_hook",
-        description: "Hook을 Skills Share에 업로드합니다.",
+        description: "Hook을 Skills Share에 업로드합니다. file_path를 제공하면 스크립트 파일도 함께 저장됩니다.",
         inputSchema: {
           type: "object",
           properties: {
@@ -561,7 +563,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             command: {
               type: "string",
-              description: "실행할 명령어",
+              description: "실행할 명령어 (file_path 제공 시 자동 생성)",
+            },
+            file_path: {
+              type: "string",
+              description: "스크립트 파일 경로 (예: ~/.claude/hooks/my-hook.js)",
             },
             timeout: {
               type: "number",
@@ -572,12 +578,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: "작성자 이름",
             },
           },
-          required: ["id", "name", "event", "command", "authorName"],
+          required: ["id", "name", "event", "authorName"],
         },
       },
       {
         name: "update_hook",
-        description: "기존에 업로드한 Hook을 업데이트합니다.",
+        description: "기존에 업로드한 Hook을 업데이트합니다. file_path를 제공하면 스크립트 내용도 업데이트됩니다.",
         inputSchema: {
           type: "object",
           properties: {
@@ -609,6 +615,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             command: {
               type: "string",
               description: "실행할 명령어 (선택사항)",
+            },
+            file_path: {
+              type: "string",
+              description: "스크립트 파일 경로 (선택사항)",
             },
             timeout: {
               type: "number",
@@ -1078,6 +1088,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const id = (args as { id: string }).id;
         const hook = await fetchAPI(`/hook?id=${encodeURIComponent(id)}`) as Hook;
 
+        let scriptInstalled = false;
+        let installedPath = "";
+
+        // Write script file if scriptContent exists
+        if (hook.scriptContent && hook.scriptPath) {
+          const hooksDir = path.join(os.homedir(), ".claude", "hooks");
+          fs.mkdirSync(hooksDir, { recursive: true });
+
+          const expandedScriptPath = hook.scriptPath.replace(/^~/, os.homedir());
+          fs.writeFileSync(expandedScriptPath, hook.scriptContent, "utf-8");
+
+          // Make executable if it's a shell script
+          if (expandedScriptPath.endsWith(".sh")) {
+            fs.chmodSync(expandedScriptPath, "755");
+          }
+
+          scriptInstalled = true;
+          installedPath = hook.scriptPath;
+        }
+
         const hookConfig = {
           type: hook.event,
           ...(hook.matcher && { matcher: hook.matcher }),
@@ -1086,6 +1116,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
 
         let instructions = `📦 ${hook.name} Hook 설치 가이드\n\n`;
+
+        if (scriptInstalled) {
+          instructions += `✅ 스크립트 파일 설치 완료: ${installedPath}\n\n`;
+        }
+
         instructions += `설정 위치: ~/.claude/settings.json\n\n`;
         instructions += `hooks 배열에 추가할 설정:\n\`\`\`json\n${JSON.stringify(hookConfig, null, 2)}\n\`\`\`\n\n`;
         instructions += `전체 설정 예시:\n\`\`\`json\n{\n  "hooks": [\n    ${JSON.stringify(hookConfig, null, 2).split('\n').join('\n    ')}\n  ]\n}\n\`\`\``;
@@ -1108,10 +1143,45 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           category?: string;
           event: string;
           matcher?: string;
-          command: string;
+          command?: string;
+          file_path?: string;
           timeout?: number;
           authorName: string;
         };
+
+        let scriptContent: string | undefined;
+        let scriptPath: string | undefined;
+        let command = hookData.command;
+
+        // Read script file if file_path is provided
+        if (hookData.file_path) {
+          const expandedPath = hookData.file_path.replace(/^~/, os.homedir());
+
+          if (!fs.existsSync(expandedPath)) {
+            throw new Error(`파일을 찾을 수 없습니다: ${hookData.file_path}`);
+          }
+
+          scriptContent = fs.readFileSync(expandedPath, "utf-8");
+          const ext = path.extname(expandedPath);
+          scriptPath = `~/.claude/hooks/${hookData.id}${ext}`;
+
+          // Auto-generate command based on file extension
+          if (!command) {
+            if (ext === ".js") {
+              command = `node ~/.claude/hooks/${hookData.id}${ext}`;
+            } else if (ext === ".sh") {
+              command = `bash ~/.claude/hooks/${hookData.id}${ext}`;
+            } else if (ext === ".py") {
+              command = `python ~/.claude/hooks/${hookData.id}${ext}`;
+            } else {
+              command = `~/.claude/hooks/${hookData.id}${ext}`;
+            }
+          }
+        }
+
+        if (!command) {
+          throw new Error("command 또는 file_path가 필요합니다.");
+        }
 
         await postAPI("/hook", {
           id: hookData.id,
@@ -1120,17 +1190,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           category: hookData.category || "Other",
           event: hookData.event,
           matcher: hookData.matcher,
-          command: hookData.command,
+          command,
+          scriptContent,
+          scriptPath,
           timeout: hookData.timeout,
           examples: [],
           authorName: hookData.authorName,
         });
 
+        let message = `✅ Hook 업로드 완료!\n\nID: ${hookData.id}\n이름: ${hookData.name}\n이벤트: ${hookData.event}`;
+        if (scriptPath) {
+          message += `\n스크립트 경로: ${scriptPath}`;
+        }
+        message += `\n\n이제 다른 사용자들도 이 Hook을 설치할 수 있습니다.`;
+
         return {
           content: [
             {
               type: "text",
-              text: `✅ Hook 업로드 완료!\n\nID: ${hookData.id}\n이름: ${hookData.name}\n이벤트: ${hookData.event}\n\n이제 다른 사용자들도 이 Hook을 설치할 수 있습니다.`,
+              text: message,
             },
           ],
         };
@@ -1145,17 +1223,42 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           event?: string;
           matcher?: string;
           command?: string;
+          file_path?: string;
           timeout?: number;
           authorName: string;
         };
 
-        await putAPI("/hook", hookData);
+        let scriptContent: string | undefined;
+        let scriptPath: string | undefined;
+
+        // Read script file if file_path is provided
+        if (hookData.file_path) {
+          const expandedPath = hookData.file_path.replace(/^~/, os.homedir());
+
+          if (!fs.existsSync(expandedPath)) {
+            throw new Error(`파일을 찾을 수 없습니다: ${hookData.file_path}`);
+          }
+
+          scriptContent = fs.readFileSync(expandedPath, "utf-8");
+          const ext = path.extname(expandedPath);
+          scriptPath = `~/.claude/hooks/${hookData.id}${ext}`;
+        }
+
+        const updatePayload: Record<string, unknown> = { ...hookData };
+        delete updatePayload.file_path;
+        if (scriptContent) updatePayload.scriptContent = scriptContent;
+        if (scriptPath) updatePayload.scriptPath = scriptPath;
+
+        await putAPI("/hook", updatePayload);
+
+        const updatedFields = Object.keys(hookData).filter(k => k !== "id" && k !== "authorName");
+        if (scriptContent) updatedFields.push("scriptContent");
 
         return {
           content: [
             {
               type: "text",
-              text: `✅ Hook 업데이트 완료!\n\nID: ${hookData.id}\n\n업데이트된 필드: ${Object.keys(hookData).filter(k => k !== "id").join(", ") || "없음"}`,
+              text: `✅ Hook 업데이트 완료!\n\nID: ${hookData.id}\n\n업데이트된 필드: ${updatedFields.join(", ") || "없음"}`,
             },
           ],
         };
