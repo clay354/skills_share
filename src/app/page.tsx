@@ -161,10 +161,10 @@ export default async function Home() {
                       <p className="text-sm text-neutral-600">{hook.description}</p>
                     </div>
                     <div className="flex gap-1 shrink-0">
-                      <span className="text-xs px-2 py-1 bg-orange-50 text-orange-600 rounded">
+                      <span className="text-xs px-2 py-1 bg-neutral-100 text-neutral-700 rounded">
                         {hook.category}
                       </span>
-                      <span className="text-xs px-2 py-1 bg-yellow-50 text-yellow-700 rounded">
+                      <span className="text-xs px-2 py-1 bg-neutral-800 text-white rounded">
                         {hook.event}
                       </span>
                     </div>
