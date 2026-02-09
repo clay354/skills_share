@@ -145,32 +145,32 @@ export default async function Home() {
       </section>
 
       {/* Hooks */}
-      <section className="border-t border-neutral-100">
+      <section className="border-t-4 border-neutral-800">
         <div className="max-w-2xl mx-auto px-6 py-12">
           <div className="mb-6">
-            <h2 className="text-xl font-semibold text-black mb-2">Hooks</h2>
-            <p className="text-neutral-500 text-sm">Event-driven automation scripts</p>
+            <h2 className="text-2xl font-bold text-neutral-900 mb-2 tracking-wide">Hooks</h2>
+            <p className="text-neutral-600 text-sm font-medium">Event-driven automation scripts</p>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-4">
             {allHooks.map((hook) => (
               <Link key={hook.id} href={`/hooks/${hook.id}`}>
-                <div className="p-4 border border-neutral-200 rounded-xl hover:border-neutral-300 hover:bg-neutral-50 transition-all">
+                <div className="p-4 bg-white border-4 border-neutral-800 shadow-[4px_4px_0px_0px_rgba(38,38,38,1)] hover:shadow-[6px_6px_0px_0px_rgba(38,38,38,1)] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h3 className="font-medium text-black mb-1">{hook.name}</h3>
-                      <p className="text-sm text-neutral-600">{hook.description}</p>
+                      <h3 className="font-bold text-neutral-900 mb-1">{hook.name}</h3>
+                      <p className="text-sm text-neutral-700">{hook.description}</p>
                     </div>
                     <div className="flex gap-1 shrink-0">
-                      <span className="text-xs px-2 py-1 bg-neutral-100 text-neutral-700 rounded">
+                      <span className="text-xs px-2 py-1 bg-neutral-200 text-neutral-800 font-bold border-2 border-neutral-800">
                         {hook.category}
                       </span>
-                      <span className="text-xs px-2 py-1 bg-neutral-800 text-white rounded">
+                      <span className="text-xs px-2 py-1 bg-neutral-800 text-white font-bold border-2 border-neutral-800">
                         {hook.event}
                       </span>
                     </div>
                   </div>
                   {hook.updatedAt && (
-                    <p className="text-xs text-neutral-400 mt-2">
+                    <p className="text-xs text-neutral-500 mt-2">
                       {new Date(hook.updatedAt).toLocaleDateString('ko-KR')} · {hook.updatedBy}
                     </p>
                   )}
