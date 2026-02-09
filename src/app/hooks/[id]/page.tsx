@@ -40,10 +40,10 @@ export default async function HookDetailPage({ params }: PageProps) {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs px-2 py-1 bg-orange-50 text-orange-600 rounded">
+            <span className="text-xs px-2 py-1 bg-neutral-100 text-neutral-700 rounded">
               {hook.category}
             </span>
-            <span className="text-xs px-2 py-1 bg-yellow-50 text-yellow-700 rounded">
+            <span className="text-xs px-2 py-1 bg-neutral-800 text-white rounded">
               {hook.event}
             </span>
           </div>
