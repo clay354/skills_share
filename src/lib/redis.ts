@@ -14,4 +14,5 @@ export const REDIS_KEYS = {
   commands: 'commands',
   plugins: 'plugins',
   mcpServers: 'mcpServers',
+  hooks: 'hooks',
 } as const;

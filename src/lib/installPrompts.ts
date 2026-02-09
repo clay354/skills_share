@@ -1,6 +1,7 @@
 import { Command } from "@/data/commands";
 import { Plugin } from "@/data/plugins";
 import { MCPServer } from "@/data/mcp";
+import { Hook } from "@/data/hooks";
 
 export function generateCommandInstallPrompt(command: Command, versionContent?: string): string {
   const content = versionContent || command.content;
@@ -86,4 +87,41 @@ ${mcp.setupSteps ? `## 추가 설정\n${mcp.setupSteps.map((step, i) => `${i + 1
 
 ${mcp.setupSteps ? `## 추가 설정\n${mcp.setupSteps.map((step, i) => `${i + 1}. ${step}`).join("\n")}` : ""}`;
   }
+}
+
+export function generateHookInstallPrompt(hook: Hook): string {
+  const hookConfig = {
+    type: hook.event,
+    ...(hook.matcher && { matcher: hook.matcher }),
+    command: hook.command,
+    ...(hook.timeout && { timeout: hook.timeout }),
+  };
+
+  const configJson = JSON.stringify(hookConfig, null, 2);
+
+  return `다음 Hook을 설정에 추가해주세요.
+
+## Hook 정보
+- **이름**: ${hook.name}
+- **이벤트**: ${hook.event}
+${hook.matcher ? `- **매처**: ${hook.matcher}` : ""}
+
+## 설치 방법
+
+\`~/.claude/settings.json\` 파일의 \`hooks\` 배열에 다음을 추가하세요:
+
+\`\`\`json
+${configJson}
+\`\`\`
+
+## 전체 설정 예시
+\`\`\`json
+{
+  "hooks": [
+    ${configJson}
+  ]
+}
+\`\`\`
+
+설정 파일 수정 후 Claude Code를 재시작하면 Hook이 활성화됩니다.`;
 }
