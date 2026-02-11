@@ -115,7 +115,7 @@ interface Hook {
 const server = new Server(
   {
     name: "skills-share",
-    version: "1.4.3",
+    version: "1.4.4",
   },
   {
     capabilities: {
