@@ -115,7 +115,7 @@ export default async function CommandDetailPage({ params }: PageProps) {
         {/* Version History */}
         <div className="border-t border-neutral-100 pt-8 mt-8">
           <h2 className="font-medium text-black mb-4">Version History</h2>
-          {hasVersions && sortedVersions.length > 1 ? (
+          {hasVersions && sortedVersions.length > 0 ? (
             <div className="space-y-3">
               {sortedVersions.map((ver) => {
                 const versionInstallPrompt = generateCommandInstallPrompt(command, ver.content);

@@ -54,6 +54,14 @@ async function putAPI(endpoint: string, data: unknown): Promise<unknown> {
   return result;
 }
 
+interface CommandVersion {
+  version: number;
+  content: string;
+  updatedAt: string;
+  updatedBy: string;
+  changelog?: string;
+}
+
 interface Command {
   id: string;
   name: string;
@@ -62,6 +70,10 @@ interface Command {
   content: string;
   installPath: string;
   examples: { input: string; description: string }[];
+  updatedAt?: string;
+  updatedBy?: string;
+  currentVersion?: number;
+  versions?: CommandVersion[];
 }
 
 interface MCPServer {
@@ -103,7 +115,7 @@ interface Hook {
 const server = new Server(
   {
     name: "skills-share",
-    version: "1.4.2",
+    version: "1.4.3",
   },
   {
     capabilities: {
@@ -152,13 +164,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "get_command_detail",
-        description: "특정 커맨드의 상세 정보와 설치 내용을 조회합니다.",
+        description: "특정 커맨드의 상세 정보와 버전 히스토리를 조회합니다. version을 지정하면 해당 버전의 내용을 반환합니다.",
         inputSchema: {
           type: "object",
           properties: {
             id: {
               type: "string",
               description: "커맨드 ID",
+            },
+            version: {
+              type: "number",
+              description: "조회할 버전 번호 (선택사항, 미지정 시 최신 버전 + 버전 히스토리 표시)",
             },
           },
           required: ["id"],
@@ -180,13 +196,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "install_command",
-        description: "커맨드를 ~/.claude/commands/ 폴더에 설치합니다.",
+        description: "커맨드를 ~/.claude/commands/ 폴더에 설치합니다. version을 지정하면 해당 버전을 설치합니다.",
         inputSchema: {
           type: "object",
           properties: {
             id: {
               type: "string",
               description: "설치할 커맨드 ID",
+            },
+            version: {
+              type: "number",
+              description: "설치할 버전 번호 (선택사항, 미지정 시 최신 버전 설치)",
             },
           },
           required: ["id"],
@@ -683,13 +703,46 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "get_command_detail": {
-        const id = (args as { id: string }).id;
-        const command = await fetchAPI(`/commands?id=${encodeURIComponent(id)}`) as Command;
+        const { id, version } = args as { id: string; version?: number };
+        const endpoint = version
+          ? `/commands?id=${encodeURIComponent(id)}&version=${version}`
+          : `/commands?id=${encodeURIComponent(id)}`;
+        const command = await fetchAPI(endpoint) as Command;
+
+        // Build version history summary
+        let versionInfo = "";
+        if (command.versions && command.versions.length > 0) {
+          const sorted = [...command.versions].sort((a, b) => b.version - a.version);
+          versionInfo = "\n\n📋 버전 히스토리:\n" + sorted.map((v) => {
+            const latest = v.version === command.currentVersion ? " (Latest)" : "";
+            const changelog = v.changelog ? ` - ${v.changelog}` : "";
+            return `  v${v.version}${latest} | ${v.updatedAt} | ${v.updatedBy}${changelog}`;
+          }).join("\n");
+        }
+
+        // Build response
+        let text = `📦 ${command.name}\n\n`;
+        text += `ID: ${command.id}\n`;
+        text += `카테고리: ${command.category}\n`;
+        text += `설명: ${command.description}\n`;
+        if (version) {
+          text += `\n🔍 요청한 버전: v${version}\n`;
+        } else if (command.currentVersion) {
+          text += `현재 버전: v${command.currentVersion}\n`;
+        }
+        if (command.updatedAt) {
+          text += `마지막 업데이트: ${command.updatedAt}`;
+          if (command.updatedBy) text += ` by ${command.updatedBy}`;
+          text += "\n";
+        }
+        text += versionInfo;
+        text += `\n\n---\n내용:\n${command.content}`;
+
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify(command, null, 2),
+              text,
             },
           ],
         };
@@ -709,8 +762,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "install_command": {
-        const id = (args as { id: string }).id;
-        const command = await fetchAPI(`/commands?id=${encodeURIComponent(id)}`) as Command;
+        const { id, version } = args as { id: string; version?: number };
+        const endpoint = version
+          ? `/commands?id=${encodeURIComponent(id)}&version=${version}`
+          : `/commands?id=${encodeURIComponent(id)}`;
+        const command = await fetchAPI(endpoint) as Command;
 
         // Create ~/.claude/commands directory
         const commandsDir = path.join(os.homedir(), ".claude", "commands");
@@ -720,11 +776,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const filePath = path.join(commandsDir, `${command.id}.md`);
         fs.writeFileSync(filePath, command.content, "utf-8");
 
+        const versionLabel = version ? `v${version}` : (command.currentVersion ? `v${command.currentVersion} (Latest)` : "");
+
         return {
           content: [
             {
               type: "text",
-              text: `✅ 커맨드 설치 완료!\n\n📁 설치 위치: ${filePath}\n\n사용법: /${command.id}\n\n예시:\n${command.examples.map((e) => `- ${e.input}: ${e.description}`).join("\n")}`,
+              text: `✅ 커맨드 설치 완료!${versionLabel ? ` [${versionLabel}]` : ""}\n\n📁 설치 위치: ${filePath}\n\n사용법: /${command.id}\n\n예시:\n${command.examples.map((e) => `- ${e.input}: ${e.description}`).join("\n")}`,
             },
           ],
         };
