@@ -1,6 +1,6 @@
 {
   "name": "skills-share-mcp",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Skills Share MCP Server - Install commands, skills, and MCP configs for Claude Code",
   "main": "dist/index.js",
   "bin": {
