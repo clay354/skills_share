@@ -173,6 +173,16 @@ export async function PUT(request: Request) {
     let versions = existingCommand.versions || [];
 
     if (updateData.content && updateData.content !== existingCommand.content) {
+      // Backfill v1 if versions array is empty (legacy data created before versioning)
+      if (versions.length === 0) {
+        versions = [{
+          version: 1,
+          content: existingCommand.content,
+          updatedAt: existingCommand.updatedAt || now,
+          updatedBy: existingCommand.updatedBy || 'unknown',
+        }];
+      }
+
       newVersion = (existingCommand.currentVersion || 1) + 1;
       const newVersionData: CommandVersion = {
         version: newVersion,
