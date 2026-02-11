@@ -11,6 +11,17 @@ interface PageProps {
 
 export const dynamic = "force-dynamic";
 
+// Simple line-based diff between two texts
+function computeDiff(oldText: string, newText: string): { added: string[]; removed: string[]; } {
+  const oldLines = oldText.split('\n');
+  const newLines = newText.split('\n');
+  const oldSet = new Set(oldLines);
+  const newSet = new Set(newLines);
+  const removed = oldLines.filter(line => !newSet.has(line) && line.trim() !== '');
+  const added = newLines.filter(line => !oldSet.has(line) && line.trim() !== '');
+  return { added, removed };
+}
+
 async function getCommandById(id: string): Promise<Command | undefined> {
   try {
     const commands = await redis.get<Command[]>(REDIS_KEYS.commands) || [];
@@ -29,10 +40,24 @@ export default async function CommandDetailPage({ params }: PageProps) {
   }
 
   const installPrompt = generateCommandInstallPrompt(command);
-  const hasVersions = command.versions && command.versions.length > 0;
-  const sortedVersions = hasVersions
-    ? [...command.versions!].sort((a, b) => b.version - a.version)
+
+  // Build version list: use existing versions, or synthesize v1 from current content for legacy data
+  let displayVersions = command.versions && command.versions.length > 0
+    ? [...command.versions]
     : [];
+
+  if (displayVersions.length === 0 && command.content) {
+    // Legacy command without versions array — synthesize v1
+    displayVersions = [{
+      version: command.currentVersion || 1,
+      content: command.content,
+      updatedAt: command.updatedAt || '',
+      updatedBy: command.updatedBy || '',
+    }];
+  }
+
+  const sortedVersions = displayVersions.sort((a, b) => b.version - a.version);
+  const hasVersions = sortedVersions.length > 0;
 
   return (
     <div className="min-h-screen bg-white">
@@ -117,9 +142,11 @@ export default async function CommandDetailPage({ params }: PageProps) {
           <h2 className="font-medium text-black mb-4">Version History</h2>
           {hasVersions && sortedVersions.length > 0 ? (
             <div className="space-y-3">
-              {sortedVersions.map((ver) => {
+              {sortedVersions.map((ver, idx) => {
                 const versionInstallPrompt = generateCommandInstallPrompt(command, ver.content);
                 const isLatest = ver.version === command.currentVersion;
+                const prevVersion = sortedVersions[idx + 1];
+                const diff = prevVersion ? computeDiff(prevVersion.content, ver.content) : null;
                 return (
                   <div
                     key={ver.version}
@@ -135,6 +162,13 @@ export default async function CommandDetailPage({ params }: PageProps) {
                             Latest
                           </span>
                         )}
+                        {diff && (diff.added.length > 0 || diff.removed.length > 0) && (
+                          <span className="text-xs text-neutral-400">
+                            {diff.added.length > 0 && <span className="text-green-600">+{diff.added.length}</span>}
+                            {diff.added.length > 0 && diff.removed.length > 0 && ' '}
+                            {diff.removed.length > 0 && <span className="text-red-500">-{diff.removed.length}</span>}
+                          </span>
+                        )}
                       </div>
                       <span className="text-xs text-neutral-500">
                         {new Date(ver.updatedAt).toLocaleDateString('ko-KR')} · {ver.updatedBy}
@@ -143,13 +177,13 @@ export default async function CommandDetailPage({ params }: PageProps) {
                     {ver.changelog && (
                       <p className="text-sm text-neutral-600 mb-3">{ver.changelog}</p>
                     )}
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <CopyButton
                         text={versionInstallPrompt}
                         label={isLatest ? "Copy Install Prompt" : `Install v${ver.version}`}
                         className="text-xs"
                       />
-                      <details className="flex-1">
+                      <details className="flex-1 min-w-0">
                         <summary className="cursor-pointer text-xs text-neutral-500 hover:text-neutral-700 py-2">
                           View content
                         </summary>
@@ -157,6 +191,21 @@ export default async function CommandDetailPage({ params }: PageProps) {
                           {ver.content}
                         </pre>
                       </details>
+                      {diff && (diff.added.length > 0 || diff.removed.length > 0) && (
+                        <details className="w-full">
+                          <summary className="cursor-pointer text-xs text-neutral-500 hover:text-neutral-700 py-1">
+                            View changes from v{prevVersion.version}
+                          </summary>
+                          <div className="mt-2 p-3 bg-white border rounded text-xs font-mono overflow-x-auto max-h-48">
+                            {diff.removed.map((line, i) => (
+                              <div key={`r-${i}`} className="text-red-600 bg-red-50 px-1">- {line}</div>
+                            ))}
+                            {diff.added.map((line, i) => (
+                              <div key={`a-${i}`} className="text-green-700 bg-green-50 px-1">+ {line}</div>
+                            ))}
+                          </div>
+                        </details>
+                      )}
                     </div>
                   </div>
                 );
