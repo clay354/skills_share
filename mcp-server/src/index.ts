@@ -398,6 +398,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description: "커맨드 설명 (선택사항)",
             },
+            changelog: {
+              type: "string",
+              description: "변경 내용 요약 (선택사항, 버전 히스토리에 표시됨)",
+            },
             authorName: {
               type: "string",
               description: "작성자 이름",
@@ -1037,12 +1041,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "update_command": {
-        const { file_path, id, name: cmdName, category, description, authorName } = args as {
+        const { file_path, id, name: cmdName, category, description, changelog, authorName } = args as {
           file_path?: string;
           id: string;
           name?: string;
           category?: string;
           description?: string;
+          changelog?: string;
           authorName: string;
         };
 
@@ -1060,6 +1065,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (cmdName) updateData.name = cmdName;
         if (category) updateData.category = category;
         if (description) updateData.description = description;
+        if (changelog) updateData.changelog = changelog;
 
         await putAPI("/commands", updateData);
 
