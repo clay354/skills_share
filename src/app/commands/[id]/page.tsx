@@ -29,10 +29,24 @@ export default async function CommandDetailPage({ params }: PageProps) {
   }
 
   const installPrompt = generateCommandInstallPrompt(command);
-  const hasVersions = command.versions && command.versions.length > 0;
-  const sortedVersions = hasVersions
-    ? [...command.versions!].sort((a, b) => b.version - a.version)
+
+  // Build version list: use existing versions, or synthesize v1 from current content for legacy data
+  let displayVersions = command.versions && command.versions.length > 0
+    ? [...command.versions]
     : [];
+
+  if (displayVersions.length === 0 && command.content) {
+    // Legacy command without versions array — synthesize v1
+    displayVersions = [{
+      version: command.currentVersion || 1,
+      content: command.content,
+      updatedAt: command.updatedAt || '',
+      updatedBy: command.updatedBy || '',
+    }];
+  }
+
+  const sortedVersions = displayVersions.sort((a, b) => b.version - a.version);
+  const hasVersions = sortedVersions.length > 0;
 
   return (
     <div className="min-h-screen bg-white">

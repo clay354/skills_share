@@ -709,10 +709,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           : `/commands?id=${encodeURIComponent(id)}`;
         const command = await fetchAPI(endpoint) as Command;
 
-        // Build version history summary
+        // Build version history summary (handle legacy data without versions array)
+        let displayVersions = command.versions && command.versions.length > 0
+          ? [...command.versions]
+          : [];
+
+        if (displayVersions.length === 0 && command.content) {
+          displayVersions = [{
+            version: command.currentVersion || 1,
+            content: command.content,
+            updatedAt: command.updatedAt || "",
+            updatedBy: command.updatedBy || "",
+          }];
+        }
+
         let versionInfo = "";
-        if (command.versions && command.versions.length > 0) {
-          const sorted = [...command.versions].sort((a, b) => b.version - a.version);
+        if (displayVersions.length > 0) {
+          const sorted = displayVersions.sort((a, b) => b.version - a.version);
           versionInfo = "\n\n📋 버전 히스토리:\n" + sorted.map((v) => {
             const latest = v.version === command.currentVersion ? " (Latest)" : "";
             const changelog = v.changelog ? ` - ${v.changelog}` : "";
