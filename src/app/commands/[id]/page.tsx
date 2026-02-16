@@ -4,6 +4,7 @@ import { Command } from "@/data/commands";
 import { generateCommandInstallPrompt } from "@/lib/installPrompts";
 import { CopyButton } from "@/components/CopyButton";
 import redis, { REDIS_KEYS } from "@/lib/redis";
+import { diffLines, type Change } from "diff";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -11,15 +12,16 @@ interface PageProps {
 
 export const dynamic = "force-dynamic";
 
-// Simple line-based diff between two texts
-function computeDiff(oldText: string, newText: string): { added: string[]; removed: string[]; } {
-  const oldLines = oldText.split('\n');
-  const newLines = newText.split('\n');
-  const oldSet = new Set(oldLines);
-  const newSet = new Set(newLines);
-  const removed = oldLines.filter(line => !newSet.has(line) && line.trim() !== '');
-  const added = newLines.filter(line => !oldSet.has(line) && line.trim() !== '');
-  return { added, removed };
+function computeDiff(oldText: string, newText: string): { changes: Change[]; addedCount: number; removedCount: number } {
+  const changes = diffLines(oldText, newText);
+  let addedCount = 0;
+  let removedCount = 0;
+  for (const change of changes) {
+    const lineCount = change.value.replace(/\n$/, '').split('\n').length;
+    if (change.added) addedCount += lineCount;
+    if (change.removed) removedCount += lineCount;
+  }
+  return { changes, addedCount, removedCount };
 }
 
 async function getCommandById(id: string): Promise<Command | undefined> {
@@ -162,11 +164,11 @@ export default async function CommandDetailPage({ params }: PageProps) {
                             Latest
                           </span>
                         )}
-                        {diff && (diff.added.length > 0 || diff.removed.length > 0) && (
+                        {diff && (diff.addedCount > 0 || diff.removedCount > 0) && (
                           <span className="text-xs text-neutral-400">
-                            {diff.added.length > 0 && <span className="text-green-600">+{diff.added.length}</span>}
-                            {diff.added.length > 0 && diff.removed.length > 0 && ' '}
-                            {diff.removed.length > 0 && <span className="text-red-500">-{diff.removed.length}</span>}
+                            {diff.addedCount > 0 && <span className="text-green-600">+{diff.addedCount}</span>}
+                            {diff.addedCount > 0 && diff.removedCount > 0 && ' '}
+                            {diff.removedCount > 0 && <span className="text-red-500">-{diff.removedCount}</span>}
                           </span>
                         )}
                       </div>
@@ -191,18 +193,27 @@ export default async function CommandDetailPage({ params }: PageProps) {
                           {ver.content}
                         </pre>
                       </details>
-                      {diff && (diff.added.length > 0 || diff.removed.length > 0) && (
+                      {diff && (diff.addedCount > 0 || diff.removedCount > 0) && (
                         <details className="w-full">
                           <summary className="cursor-pointer text-xs text-neutral-500 hover:text-neutral-700 py-1">
                             View changes from v{prevVersion.version}
                           </summary>
                           <div className="mt-2 p-3 bg-white border rounded text-xs font-mono overflow-x-auto max-h-48">
-                            {diff.removed.map((line, i) => (
-                              <div key={`r-${i}`} className="text-red-600 bg-red-50 px-1">- {line}</div>
-                            ))}
-                            {diff.added.map((line, i) => (
-                              <div key={`a-${i}`} className="text-green-700 bg-green-50 px-1">+ {line}</div>
-                            ))}
+                            {diff.changes.map((change, i) => {
+                              const lines = change.value.replace(/\n$/, '').split('\n');
+                              return lines.map((line, j) => (
+                                <div
+                                  key={`${i}-${j}`}
+                                  className={
+                                    change.added ? "text-green-700 bg-green-50 px-1" :
+                                    change.removed ? "text-red-600 bg-red-50 px-1" :
+                                    "text-neutral-400 px-1"
+                                  }
+                                >
+                                  {change.added ? '+ ' : change.removed ? '- ' : '  '}{line}
+                                </div>
+                              ));
+                            })}
                           </div>
                         </details>
                       )}
