@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import redis, { REDIS_KEYS } from '@/lib/redis';
-import { Hook } from '@/data/hooks';
+import { Hook, HookVersion } from '@/data/hooks';
 import { getKoreanTimeISO } from '@/lib/utils';
 
 // Get all hooks from Redis
@@ -82,8 +82,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // Build complete hook object
+    // Build complete hook object with version 1
     const now = getKoreanTimeISO();
+    const initialVersion: HookVersion = {
+      version: 1,
+      command: newHook.command,
+      scriptContent: newHook.scriptContent,
+      matcher: newHook.matcher,
+      timeout: newHook.timeout,
+      updatedAt: now,
+      updatedBy: newHook.authorName,
+    };
+
     const hook: Hook = {
       id: newHook.id,
       name: newHook.name,
@@ -99,6 +109,8 @@ export async function POST(request: Request) {
       createdAt: now,
       updatedAt: now,
       updatedBy: newHook.authorName,
+      currentVersion: 1,
+      versions: [initialVersion],
     };
 
     // Add new hook
@@ -118,7 +130,7 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const updateData = await request.json() as Partial<Hook> & { authorName?: string };
+    const updateData = await request.json() as Partial<Hook> & { authorName?: string; changelog?: string };
 
     // Validate required fields
     if (!updateData.id) {
@@ -149,6 +161,42 @@ export async function PUT(request: Request) {
     const existingHook = hooks[existingIndex];
     const now = getKoreanTimeISO();
 
+    // Check if versioned content changed (command or scriptContent)
+    const commandChanged = updateData.command && updateData.command !== existingHook.command;
+    const scriptChanged = updateData.scriptContent !== undefined && updateData.scriptContent !== existingHook.scriptContent;
+    const contentChanged = commandChanged || scriptChanged;
+
+    let newVersion: number = existingHook.currentVersion || 1;
+    let versions = existingHook.versions || [];
+
+    if (contentChanged) {
+      // Backfill v1 if versions array is empty (legacy data)
+      if (versions.length === 0) {
+        versions = [{
+          version: 1,
+          command: existingHook.command,
+          scriptContent: existingHook.scriptContent,
+          matcher: existingHook.matcher,
+          timeout: existingHook.timeout,
+          updatedAt: existingHook.updatedAt || now,
+          updatedBy: existingHook.updatedBy || 'unknown',
+        }];
+      }
+
+      newVersion = (existingHook.currentVersion || 1) + 1;
+      const newVersionData: HookVersion = {
+        version: newVersion,
+        command: updateData.command || existingHook.command,
+        scriptContent: updateData.scriptContent ?? existingHook.scriptContent,
+        matcher: updateData.matcher ?? existingHook.matcher,
+        timeout: updateData.timeout ?? existingHook.timeout,
+        updatedAt: now,
+        updatedBy: updateData.authorName,
+        changelog: updateData.changelog,
+      };
+      versions = [...versions, newVersionData];
+    }
+
     // Merge with existing hook
     const updatedHook: Hook = {
       ...existingHook,
@@ -164,6 +212,8 @@ export async function PUT(request: Request) {
       examples: updateData.examples || existingHook.examples,
       updatedAt: now,
       updatedBy: updateData.authorName,
+      currentVersion: newVersion,
+      versions: versions,
     };
 
     // Replace in array
@@ -175,7 +225,8 @@ export async function PUT(request: Request) {
     return NextResponse.json({
       success: true,
       id: updatedHook.id,
-      message: 'Hook updated successfully'
+      version: newVersion,
+      message: `Hook updated successfully (v${newVersion})`
     });
   } catch (error) {
     return NextResponse.json(

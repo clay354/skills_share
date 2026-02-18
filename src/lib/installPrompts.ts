@@ -89,12 +89,17 @@ ${mcp.setupSteps ? `## 추가 설정\n${mcp.setupSteps.map((step, i) => `${i + 1
   }
 }
 
-export function generateHookInstallPrompt(hook: Hook): string {
+export function generateHookInstallPrompt(hook: Hook, versionOverride?: { command: string; scriptContent?: string; matcher?: string; timeout?: number }): string {
+  const command = versionOverride?.command ?? hook.command;
+  const scriptContent = versionOverride?.scriptContent ?? hook.scriptContent;
+  const matcher = versionOverride?.matcher ?? hook.matcher;
+  const timeout = versionOverride?.timeout ?? hook.timeout;
+
   const hookConfig = {
     type: hook.event,
-    ...(hook.matcher && { matcher: hook.matcher }),
-    command: hook.command,
-    ...(hook.timeout && { timeout: hook.timeout }),
+    ...(matcher && { matcher }),
+    command,
+    ...(timeout && { timeout }),
   };
 
   const configJson = JSON.stringify(hookConfig, null, 2);
@@ -104,18 +109,18 @@ export function generateHookInstallPrompt(hook: Hook): string {
 ## Hook 정보
 - **이름**: ${hook.name}
 - **이벤트**: ${hook.event}
-${hook.matcher ? `- **매처**: ${hook.matcher}` : ""}
+${matcher ? `- **매처**: ${matcher}` : ""}
 `;
 
   // 스크립트 파일이 있으면 먼저 파일 생성 안내
-  if (hook.scriptContent && hook.scriptPath) {
+  if (scriptContent && hook.scriptPath) {
     prompt += `
 ## 1. 스크립트 파일 생성
 
 \`${hook.scriptPath}\` 경로에 다음 내용을 저장해주세요. 디렉토리가 없으면 생성해주세요.
 
 \`\`\`
-${hook.scriptContent}
+${scriptContent}
 \`\`\`
 
 ## 2. Hook 설정 추가
