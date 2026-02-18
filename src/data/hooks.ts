@@ -1,3 +1,14 @@
+export interface HookVersion {
+  version: number;
+  command: string;
+  scriptContent?: string;
+  matcher?: string;
+  timeout?: number;
+  updatedAt: string;
+  updatedBy: string;
+  changelog?: string;
+}
+
 export interface Hook {
   id: string;
   name: string;
@@ -13,4 +24,6 @@ export interface Hook {
   createdAt: string;
   updatedAt?: string;
   updatedBy?: string;
+  currentVersion?: number;
+  versions?: HookVersion[];
 }
