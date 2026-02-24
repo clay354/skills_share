@@ -2,6 +2,7 @@ import { Command } from "@/data/commands";
 import { Plugin } from "@/data/plugins";
 import { MCPServer } from "@/data/mcp";
 import { marketplaces } from "@/data/plugins";
+import { Hook } from "@/data/hooks";
 
 export function generateCommandInstallPrompt(command: Command, versionContent?: string): string {
   const content = versionContent || command.content;
