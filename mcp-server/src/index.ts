@@ -94,8 +94,13 @@ interface Plugin {
   description: string;
   category: string;
   marketplace: string;
+  installCommand: string;
+  features: string[];
   agents?: string[];
   skills?: string[];
+  examples: { input: string; description: string }[];
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 interface Hook {
@@ -115,7 +120,7 @@ interface Hook {
 const server = new Server(
   {
     name: "skills-share",
-    version: "1.4.4",
+    version: "1.5.0",
   },
   {
     capabilities: {
@@ -195,6 +200,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: "get_plugin_detail",
+        description: "특정 플러그인의 상세 정보를 조회합니다.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description: "플러그인 ID",
+            },
+          },
+          required: ["id"],
+        },
+      },
+      {
         name: "install_command",
         description: "커맨드를 ~/.claude/commands/ 폴더에 설치합니다. version을 지정하면 해당 버전을 설치합니다.",
         inputSchema: {
@@ -221,6 +240,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             id: {
               type: "string",
               description: "설치할 MCP 서버 ID",
+            },
+          },
+          required: ["id"],
+        },
+      },
+      {
+        name: "install_plugin",
+        description: "플러그인 설치 안내를 출력합니다. 마켓플레이스 추가 및 플러그인 설치 명령어를 제공합니다.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description: "설치할 플러그인 ID",
             },
           },
           required: ["id"],
@@ -778,6 +811,43 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      case "get_plugin_detail": {
+        const id = (args as { id: string }).id;
+        const plugin = await fetchAPI(`/plugins?id=${encodeURIComponent(id)}`) as Plugin;
+
+        let text = `📦 ${plugin.name}\n\n`;
+        text += `ID: ${plugin.id}\n`;
+        text += `카테고리: ${plugin.category}\n`;
+        text += `마켓플레이스: ${plugin.marketplace}\n`;
+        text += `설명: ${plugin.description}\n`;
+        if (plugin.updatedAt) {
+          text += `마지막 업데이트: ${plugin.updatedAt}`;
+          if (plugin.updatedBy) text += ` by ${plugin.updatedBy}`;
+          text += "\n";
+        }
+        if (plugin.features && plugin.features.length > 0) {
+          text += `\n주요 기능:\n${plugin.features.map(f => `  - ${f}`).join("\n")}\n`;
+        }
+        if (plugin.agents && plugin.agents.length > 0) {
+          text += `\n에이전트:\n${plugin.agents.map(a => `  - ${a}`).join("\n")}\n`;
+        }
+        if (plugin.skills && plugin.skills.length > 0) {
+          text += `\n스킬:\n${plugin.skills.map(s => `  - ${s}`).join("\n")}\n`;
+        }
+        if (plugin.examples && plugin.examples.length > 0) {
+          text += `\n사용 예시:\n${plugin.examples.map(e => `  - ${e.input}: ${e.description}`).join("\n")}\n`;
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text,
+            },
+          ],
+        };
+      }
+
       case "install_command": {
         const { id, version } = args as { id: string; version?: number };
         const endpoint = version
@@ -822,6 +892,38 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           mcp.setupSteps.forEach((step, i) => {
             instructions += `${i + 1}. ${step}\n`;
           });
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: instructions,
+            },
+          ],
+        };
+      }
+
+      case "install_plugin": {
+        const id = (args as { id: string }).id;
+        const plugin = await fetchAPI(`/plugins?id=${encodeURIComponent(id)}`) as Plugin;
+
+        // Marketplace URL (hardcoded for now, could be fetched from API)
+        const marketplaceUrl = `https://github.com/anthropics/${plugin.marketplace}`;
+
+        let instructions = `📦 ${plugin.name} 설치 가이드\n\n`;
+        instructions += `## 1. 마켓플레이스 추가 (처음 한 번만)\n`;
+        instructions += `Claude Code에서 다음 명령어를 실행하세요:\n`;
+        instructions += `\`\`\`\n/plugin marketplace add ${marketplaceUrl}\n\`\`\`\n\n`;
+        instructions += `## 2. 플러그인 설치\n`;
+        instructions += `마켓플레이스 추가 후 다음 명령어로 플러그인을 설치하세요:\n`;
+        instructions += `\`\`\`\n/plugin install ${plugin.id}@${plugin.marketplace}\n\`\`\`\n\n`;
+        instructions += `## 3. 플러그인 활성화\n`;
+        instructions += `설치 후 \`~/.claude/settings.json\`에서 플러그인이 활성화되어 있는지 확인하세요:\n`;
+        instructions += `\`\`\`json\n{\n  "enabledPlugins": {\n    "${plugin.id}@${plugin.marketplace}": true\n  }\n}\n\`\`\`\n`;
+
+        if (plugin.features && plugin.features.length > 0) {
+          instructions += `\n## 주요 기능\n${plugin.features.map(f => `- ${f}`).join("\n")}\n`;
         }
 
         return {
