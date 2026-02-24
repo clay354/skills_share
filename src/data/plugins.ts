@@ -18,7 +18,7 @@ export const plugins: Plugin[] = [
     description: "소프트웨어 개발을 위한 종합 플러그인. 프론트엔드/백엔드 개발, UI/UX 디자인, 코드 디버깅, 문서화, 테스트를 위한 전문 에이전트와 스킬을 제공합니다.",
     category: "Development",
     marketplace: "coding-basic-plugins",
-    installCommand: "/install-plugin development@coding-basic-plugins",
+    installCommand: "/plugin install development@coding-basic-plugins",
     features: [
       "전문 개발 에이전트 (프론트엔드, 백엔드, UI/UX 등)",
       "Git 브랜치 관리 자동화",
@@ -55,7 +55,7 @@ export const plugins: Plugin[] = [
     description: "데이터 분석 및 머신러닝을 위한 전문 플러그인. EDA, 데이터 전처리, 모델링, 시각화를 위한 에이전트와 스킬을 제공합니다.",
     category: "Data Science",
     marketplace: "coding-basic-plugins",
-    installCommand: "/install-plugin data-science@coding-basic-plugins",
+    installCommand: "/plugin install data-science@coding-basic-plugins",
     features: [
       "탐색적 데이터 분석 (EDA) 자동화",
       "데이터 정제 및 전처리",
@@ -90,6 +90,6 @@ export const marketplaces = [
     name: "Coding Basic Plugins",
     description: "개발 및 데이터 사이언스를 위한 기본 플러그인 마켓플레이스",
     source: "https://github.com/anthropics/coding-basic-plugins",
-    installCommand: "/install-marketplace https://github.com/anthropics/coding-basic-plugins"
+    installCommand: "/plugin marketplace add https://github.com/anthropics/coding-basic-plugins"
   }
 ];
