@@ -1,7 +1,20 @@
 import Link from "next/link";
-import { mcpServers } from "@/data/mcp";
+import { MCPServer } from "@/data/mcp";
+import redis, { REDIS_KEYS } from "@/lib/redis";
 
-export default function MCPPage() {
+export const dynamic = "force-dynamic";
+
+async function getMcpServers(): Promise<MCPServer[]> {
+  try {
+    return await redis.get<MCPServer[]>(REDIS_KEYS.mcpServers) || [];
+  } catch {
+    return [];
+  }
+}
+
+export default async function MCPPage() {
+  const mcpServers = await getMcpServers();
+
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-3xl mx-auto px-6 py-20">

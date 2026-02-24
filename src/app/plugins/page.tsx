@@ -1,7 +1,20 @@
 import Link from "next/link";
-import { plugins } from "@/data/plugins";
+import { Plugin } from "@/data/plugins";
+import redis, { REDIS_KEYS } from "@/lib/redis";
 
-export default function PluginsPage() {
+export const dynamic = "force-dynamic";
+
+async function getPlugins(): Promise<Plugin[]> {
+  try {
+    return await redis.get<Plugin[]>(REDIS_KEYS.plugins) || [];
+  } catch {
+    return [];
+  }
+}
+
+export default async function PluginsPage() {
+  const plugins = await getPlugins();
+
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-3xl mx-auto px-6 py-20">

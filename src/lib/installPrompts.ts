@@ -3,7 +3,8 @@ import { Plugin } from "@/data/plugins";
 import { MCPServer } from "@/data/mcp";
 import { marketplaces } from "@/data/plugins";
 
-export function generateCommandInstallPrompt(command: Command): string {
+export function generateCommandInstallPrompt(command: Command, versionContent?: string): string {
+  const content = versionContent || command.content;
   return `다음 커스텀 커맨드를 설치해주세요.
 
 ## 설치 경로
@@ -11,7 +12,7 @@ export function generateCommandInstallPrompt(command: Command): string {
 
 ## 파일 내용
 \`\`\`markdown
-${command.content}
+${content}
 \`\`\`
 
 위 내용을 \`${command.installPath}\` 경로에 저장해주세요. 디렉토리가 없으면 생성해주세요.`;
@@ -52,8 +53,9 @@ Claude Code에서 다음 명령어를 실행하세요:
 \`\`\``;
 }
 
-export function generateMCPInstallPrompt(mcp: MCPServer): string {
-  const configJson = JSON.stringify(mcp.config, null, 2);
+export function generateMCPInstallPrompt(mcp: MCPServer, versionConfig?: Record<string, unknown>): string {
+  const config = versionConfig || mcp.config;
+  const configJson = JSON.stringify(config, null, 2);
 
   if (mcp.installLocation === "global") {
     return `다음 MCP 서버를 전역 설정에 추가해주세요.
@@ -88,4 +90,58 @@ ${mcp.setupSteps ? `## 추가 설정\n${mcp.setupSteps.map((step, i) => `${i + 1
 
 ${mcp.setupSteps ? `## 추가 설정\n${mcp.setupSteps.map((step, i) => `${i + 1}. ${step}`).join("\n")}` : ""}`;
   }
+}
+
+export function generateHookInstallPrompt(hook: Hook, versionOverride?: { command: string; scriptContent?: string; matcher?: string; timeout?: number }): string {
+  const command = versionOverride?.command ?? hook.command;
+  const scriptContent = versionOverride?.scriptContent ?? hook.scriptContent;
+  const matcher = versionOverride?.matcher ?? hook.matcher;
+  const timeout = versionOverride?.timeout ?? hook.timeout;
+
+  const hookConfig = {
+    type: hook.event,
+    ...(matcher && { matcher }),
+    command,
+    ...(timeout && { timeout }),
+  };
+
+  const configJson = JSON.stringify(hookConfig, null, 2);
+
+  let prompt = `다음 Hook을 설치해주세요.
+
+## Hook 정보
+- **이름**: ${hook.name}
+- **이벤트**: ${hook.event}
+${matcher ? `- **매처**: ${matcher}` : ""}
+`;
+
+  // 스크립트 파일이 있으면 먼저 파일 생성 안내
+  if (scriptContent && hook.scriptPath) {
+    prompt += `
+## 1. 스크립트 파일 생성
+
+\`${hook.scriptPath}\` 경로에 다음 내용을 저장해주세요. 디렉토리가 없으면 생성해주세요.
+
+\`\`\`
+${scriptContent}
+\`\`\`
+
+## 2. Hook 설정 추가
+`;
+  } else {
+    prompt += `
+## 설치 방법
+`;
+  }
+
+  prompt += `
+\`~/.claude/settings.json\` 파일의 \`hooks\` 배열에 다음을 추가하세요:
+
+\`\`\`json
+${configJson}
+\`\`\`
+
+설정 파일 수정 후 Claude Code를 재시작하면 Hook이 활성화됩니다.`;
+
+  return prompt;
 }

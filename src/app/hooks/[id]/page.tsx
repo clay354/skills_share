@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Command } from "@/data/commands";
-import { generateCommandInstallPrompt } from "@/lib/installPrompts";
+import { Hook } from "@/data/hooks";
+import { generateHookInstallPrompt } from "@/lib/installPrompts";
 import { CopyButton } from "@/components/CopyButton";
 import redis, { REDIS_KEYS } from "@/lib/redis";
 import { diffLines, type Change } from "diff";
@@ -24,37 +24,47 @@ function computeDiff(oldText: string, newText: string): { changes: Change[]; add
   return { changes, addedCount, removedCount };
 }
 
-async function getCommandById(id: string): Promise<Command | undefined> {
+function buildVersionContent(ver: { command: string; scriptContent?: string; matcher?: string; timeout?: number }): string {
+  let content = ver.command;
+  if (ver.scriptContent) content += '\n---\n' + ver.scriptContent;
+  if (ver.matcher) content += '\n---\nmatcher: ' + ver.matcher;
+  if (ver.timeout) content += '\ntimeout: ' + ver.timeout;
+  return content;
+}
+
+async function getHookById(id: string): Promise<Hook | undefined> {
   try {
-    const commands = await redis.get<Command[]>(REDIS_KEYS.commands) || [];
-    return commands.find((cmd) => cmd.id === id);
+    const hooks = await redis.get<Hook[]>(REDIS_KEYS.hooks) || [];
+    return hooks.find((h) => h.id === id);
   } catch {
     return undefined;
   }
 }
 
-export default async function CommandDetailPage({ params }: PageProps) {
+export default async function HookDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const command = await getCommandById(id);
+  const hook = await getHookById(id);
 
-  if (!command) {
+  if (!hook) {
     notFound();
   }
 
-  const installPrompt = generateCommandInstallPrompt(command);
+  const installPrompt = generateHookInstallPrompt(hook);
 
-  // Build version list: use existing versions, or synthesize v1 from current content for legacy data
-  let displayVersions = command.versions && command.versions.length > 0
-    ? [...command.versions]
+  // Build version list
+  let displayVersions = hook.versions && hook.versions.length > 0
+    ? [...hook.versions]
     : [];
 
-  if (displayVersions.length === 0 && command.content) {
-    // Legacy command without versions array — synthesize v1
+  if (displayVersions.length === 0 && hook.command) {
     displayVersions = [{
-      version: command.currentVersion || 1,
-      content: command.content,
-      updatedAt: command.updatedAt || '',
-      updatedBy: command.updatedBy || '',
+      version: hook.currentVersion || 1,
+      command: hook.command,
+      scriptContent: hook.scriptContent,
+      matcher: hook.matcher,
+      timeout: hook.timeout,
+      updatedAt: hook.updatedAt || '',
+      updatedBy: hook.updatedBy || '',
     }];
   }
 
@@ -71,29 +81,32 @@ export default async function CommandDetailPage({ params }: PageProps) {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded">
-              {command.category}
+            <span className="text-xs px-2 py-1 bg-neutral-100 text-neutral-700 rounded">
+              {hook.category}
             </span>
-            {command.currentVersion && (
+            <span className="text-xs px-2 py-1 bg-neutral-800 text-white rounded">
+              {hook.event}
+            </span>
+            {hook.currentVersion && (
               <span className="text-xs px-2 py-1 bg-green-50 text-green-600 rounded">
-                v{command.currentVersion}
+                v{hook.currentVersion}
               </span>
             )}
           </div>
-          <h1 className="text-2xl font-semibold text-black mb-2">{command.name}</h1>
-          <p className="text-neutral-600">{command.description}</p>
-          {command.updatedAt && (
+          <h1 className="text-2xl font-semibold text-black mb-2">{hook.name}</h1>
+          <p className="text-neutral-600">{hook.description}</p>
+          {hook.updatedAt && (
             <p className="text-sm text-neutral-500 mt-3">
-              Updated: {new Date(command.updatedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-              {command.updatedBy && <span> by <span className="font-medium text-neutral-600">{command.updatedBy}</span></span>}
+              Updated: {new Date(hook.updatedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              {hook.updatedBy && <span> by <span className="font-medium text-neutral-600">{hook.updatedBy}</span></span>}
             </p>
           )}
         </div>
 
-        {/* Install (Latest) */}
+        {/* Install */}
         <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-6 mb-8">
           <h2 className="font-medium text-black mb-3">
-            Install {command.currentVersion && <span className="text-neutral-400 font-normal">(v{command.currentVersion} - Latest)</span>}
+            Install {hook.currentVersion && <span className="text-neutral-400 font-normal">(v{hook.currentVersion} - Latest)</span>}
           </h2>
           <p className="text-sm text-neutral-600 mb-4">
             Copy the prompt below and paste it into Claude Code.
@@ -106,38 +119,71 @@ export default async function CommandDetailPage({ params }: PageProps) {
         </div>
 
         {/* Examples */}
-        <div className="mb-8">
-          <h2 className="font-medium text-black mb-4">Examples</h2>
-          <div className="space-y-3">
-            {command.examples.map((ex, i) => (
-              <div key={i} className="bg-neutral-50 rounded-xl p-4">
-                <p className="text-sm text-black mb-1">{ex.description}</p>
-                <p className="text-xs text-neutral-500 font-mono">{ex.input}</p>
-              </div>
-            ))}
+        {hook.examples && hook.examples.length > 0 && (
+          <div className="mb-8">
+            <h2 className="font-medium text-black mb-4">Examples</h2>
+            <div className="space-y-3">
+              {hook.examples.map((ex, i) => (
+                <div key={i} className="bg-neutral-50 rounded-xl p-4">
+                  <p className="text-sm text-black mb-1">{ex.description}</p>
+                  <p className="text-xs text-neutral-500 font-mono">{ex.input}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Details */}
         <div className="border-t border-neutral-100 pt-8">
           <h2 className="font-medium text-black mb-4">Details</h2>
-          <div className="bg-neutral-50 rounded-xl p-4">
-            <p className="text-sm text-neutral-600 mb-2">
-              Path: <span className="font-mono">{command.installPath}</span>
-            </p>
-            <p className="text-sm text-neutral-600 mb-4">
-              Usage: <span className="font-mono">/{command.id}</span>
-            </p>
-            <details>
-              <summary className="cursor-pointer text-sm text-neutral-500 hover:text-neutral-700">
-                View current file content
-              </summary>
-              <pre className="mt-3 p-3 bg-white border rounded text-xs text-neutral-600 overflow-x-auto max-h-64">
-                {command.content}
+          <div className="bg-neutral-50 rounded-xl p-4 space-y-3">
+            <div>
+              <p className="text-sm text-neutral-500">Event</p>
+              <p className="text-sm font-mono text-black">{hook.event}</p>
+            </div>
+            {hook.matcher && (
+              <div>
+                <p className="text-sm text-neutral-500">Matcher</p>
+                <p className="text-sm font-mono text-black">{hook.matcher}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-sm text-neutral-500">Command</p>
+              <pre className="text-sm font-mono text-black bg-white border rounded p-2 mt-1 overflow-x-auto">
+                {hook.command}
               </pre>
-            </details>
+            </div>
+            {hook.timeout && (
+              <div>
+                <p className="text-sm text-neutral-500">Timeout</p>
+                <p className="text-sm font-mono text-black">{hook.timeout}ms</p>
+              </div>
+            )}
+            {hook.scriptPath && (
+              <div>
+                <p className="text-sm text-neutral-500">Script Path</p>
+                <p className="text-sm font-mono text-black">{hook.scriptPath}</p>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Script Content */}
+        {hook.scriptContent && (
+          <div className="border-t border-neutral-100 pt-8 mt-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-medium text-black">Script Content</h2>
+              <CopyButton
+                text={hook.scriptContent}
+                label="Copy Script"
+                className="text-sm"
+              />
+            </div>
+            <pre className="bg-neutral-900 text-neutral-100 rounded-xl p-4 text-sm font-mono overflow-x-auto max-h-96 overflow-y-auto">
+              {hook.scriptContent}
+            </pre>
+          </div>
+        )}
 
         {/* Version History */}
         <div className="border-t border-neutral-100 pt-8 mt-8">
@@ -145,10 +191,17 @@ export default async function CommandDetailPage({ params }: PageProps) {
           {hasVersions && sortedVersions.length > 0 ? (
             <div className="space-y-3">
               {sortedVersions.map((ver, idx) => {
-                const versionInstallPrompt = generateCommandInstallPrompt(command, ver.content);
-                const isLatest = ver.version === command.currentVersion;
+                const versionInstallPrompt = generateHookInstallPrompt(hook, {
+                  command: ver.command,
+                  scriptContent: ver.scriptContent,
+                  matcher: ver.matcher,
+                  timeout: ver.timeout,
+                });
+                const isLatest = ver.version === hook.currentVersion;
                 const prevVersion = sortedVersions[idx + 1];
-                const diff = prevVersion ? computeDiff(prevVersion.content, ver.content) : null;
+                const diff = prevVersion
+                  ? computeDiff(buildVersionContent(prevVersion), buildVersionContent(ver))
+                  : null;
                 return (
                   <div
                     key={ver.version}
@@ -189,9 +242,23 @@ export default async function CommandDetailPage({ params }: PageProps) {
                         <summary className="cursor-pointer text-xs text-neutral-500 hover:text-neutral-700 py-2">
                           View content
                         </summary>
-                        <pre className="mt-2 p-3 bg-white border rounded text-xs text-neutral-600 overflow-x-auto max-h-40">
-                          {ver.content}
-                        </pre>
+                        <div className="mt-2 p-3 bg-white border rounded text-xs font-mono overflow-x-auto max-h-40 space-y-2">
+                          <div>
+                            <span className="text-neutral-400">command:</span>
+                            <pre className="text-neutral-600 mt-1">{ver.command}</pre>
+                          </div>
+                          {ver.scriptContent && (
+                            <div>
+                              <span className="text-neutral-400">script:</span>
+                              <pre className="text-neutral-600 mt-1">{ver.scriptContent}</pre>
+                            </div>
+                          )}
+                          {ver.matcher && (
+                            <div>
+                              <span className="text-neutral-400">matcher:</span> <span className="text-neutral-600">{ver.matcher}</span>
+                            </div>
+                          )}
+                        </div>
                       </details>
                       {diff && (diff.addedCount > 0 || diff.removedCount > 0) && (
                         <details className="w-full">
