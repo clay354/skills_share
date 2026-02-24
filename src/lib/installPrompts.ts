@@ -1,7 +1,7 @@
 import { Command } from "@/data/commands";
 import { Plugin } from "@/data/plugins";
 import { MCPServer } from "@/data/mcp";
-import { Hook } from "@/data/hooks";
+import { marketplaces } from "@/data/plugins";
 
 export function generateCommandInstallPrompt(command: Command, versionContent?: string): string {
   const content = versionContent || command.content;
@@ -19,6 +19,9 @@ ${content}
 }
 
 export function generatePluginInstallPrompt(plugin: Plugin): string {
+  const marketplace = marketplaces.find(m => m.id === plugin.marketplace);
+  const marketplaceSource = marketplace?.source || `https://github.com/anthropics/${plugin.marketplace}`;
+
   return `다음 플러그인을 설치해주세요.
 
 ## 플러그인 정보
@@ -30,13 +33,13 @@ export function generatePluginInstallPrompt(plugin: Plugin): string {
 ### 1. 마켓플레이스 추가 (처음 한 번만)
 Claude Code에서 다음 명령어를 실행하세요:
 \`\`\`
-/install-marketplace https://github.com/anthropics/coding-basic-plugins
+/plugin marketplace add ${marketplaceSource}
 \`\`\`
 
 ### 2. 플러그인 설치
 마켓플레이스 추가 후 다음 명령어로 플러그인을 설치하세요:
 \`\`\`
-${plugin.installCommand}
+/plugin install ${plugin.id}@${plugin.marketplace}
 \`\`\`
 
 ### 3. 플러그인 활성화
